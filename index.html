@@ -6,77 +6,214 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quojo Phages Online Shop</title>
 <style>
+:root{--orange:#f68b1e;--dark:#282828;--light:#f5f5f5}
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f5f6fa;color:#222}
-header{background:#142d4e;color:white;padding:22px 16px;text-align:center}
-header h1{margin:0;color:#ff9c35}
-header p{margin:8px 0 0}
-nav{background:#fff;padding:14px;text-align:center}
-nav a{color:#142d4e;text-decoration:none;margin:0 10px;font-weight:bold}
-.hero{background:#142d4e;color:white;text-align:center;padding:45px 20px}
-.hero h2{font-size:28px}
-.hero p{line-height:1.6}
-.container{padding:20px;max-width:1000px;margin:auto}
-.products{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
-.card{background:white;padding:20px;border-radius:12px;text-align:center;box-shadow:0 2px 8px #0001}
-.card h3{color:#142d4e}
-.price{font-size:22px;font-weight:bold;color:#e87521}
-button{background:#e87521;color:white;border:0;padding:12px 18px;border-radius:7px;font-weight:bold;cursor:pointer}
-.contact{background:#142d4e;color:white;padding:30px 20px;text-align:center}
-footer{text-align:center;padding:16px;color:#555}
+body{margin:0;font-family:Arial,sans-serif;background:var(--light);color:#282828}
+.top{background:#fff;text-align:center;padding:7px;font-size:12px;color:#555}
+header{background:var(--orange);padding:13px 4%;color:white;position:sticky;top:0;z-index:10}
+.head{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.logo{font-size:22px;font-weight:900;line-height:1.1}
+.logo small{display:block;font-size:10px;letter-spacing:2px}
+.search{display:flex;flex:1;max-width:600px}
+.search input{width:100%;padding:12px;border:0;border-radius:4px 0 0 4px;font-size:14px}
+.search button{background:#333;color:white;border:0;padding:0 18px;border-radius:0 4px 4px 0}
+.head a{color:white;text-decoration:none;font-size:14px;font-weight:bold}
+nav{background:white;padding:12px 4%;display:flex;gap:25px;overflow:auto;white-space:nowrap}
+nav a{color:#333;text-decoration:none;font-size:13px;font-weight:bold}
+main{max-width:1200px;margin:18px auto;padding:0 12px}
+.hero{background:linear-gradient(110deg,#f68b1e,#ffbd65);border-radius:7px;padding:35px 25px;color:white;min-height:190px;display:flex;align-items:center;justify-content:space-between;gap:15px}
+.hero h1{font-size:30px;margin:0 0 10px}
+.hero p{font-size:15px}
+.hero .shop{background:white;color:#e87912;padding:12px 18px;border-radius:4px;display:inline-block;text-decoration:none;font-weight:bold}
+.hero-icon{font-size:75px}
+.section{background:white;margin-top:18px;padding:16px;border-radius:6px}
+.section h2{font-size:19px;margin:0 0 15px}
+.categories{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.category{background:#fff8f0;border-radius:6px;padding:15px 5px;text-align:center;cursor:pointer;border:1px solid #f5e6d6}
+.category span{font-size:27px;display:block;margin-bottom:8px}
+.category b{font-size:12px}
+.filters{display:flex;gap:9px;overflow:auto;margin-bottom:15px}
+.filters button{border:1px solid #ddd;background:white;padding:9px 14px;border-radius:20px;white-space:nowrap;cursor:pointer}
+.filters button.active{background:var(--orange);color:white;border-color:var(--orange)}
+.products{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.product{border:1px solid #eee;border-radius:6px;overflow:hidden;background:white;position:relative}
+.product img{width:100%;height:145px;object-fit:cover;background:#eee}
+.product-info{padding:10px}
+.product h3{font-size:14px;font-weight:normal;margin:0 0 9px;min-height:32px}
+.price{font-weight:bold;color:#e87912;font-size:14px}
+.product button{width:100%;margin-top:10px;padding:10px;background:var(--orange);color:white;border:0;border-radius:4px;font-weight:bold;cursor:pointer}
+.tag{position:absolute;top:8px;left:8px;background:#ffe5c8;padding:5px;font-size:10px;border-radius:3px}
+.banner{background:#292929;color:white;padding:22px;border-radius:6px;margin-top:18px}
+.banner h2{margin:0 0 7px;color:#ffad4c}
+footer{background:#282828;color:white;text-align:center;padding:25px 15px;margin-top:25px;font-size:13px}
+footer a{color:#ffad4c}
+.cart-panel{position:fixed;right:0;top:0;width:min(360px,90%);height:100%;background:white;z-index:30;box-shadow:0 0 0 100vw #0007;padding:20px;display:none;overflow:auto}
+.cart-panel.open{display:block}
+.cart-head{display:flex;justify-content:space-between;align-items:center}
+.cart-head button{border:0;background:none;font-size:25px}
+.cart-item{padding:12px 0;border-bottom:1px solid #eee;font-size:14px}
+.cart-item button{margin-left:8px}
+.checkout{display:block;width:100%;padding:13px;background:#168b45;color:white;border:0;border-radius:5px;margin-top:15px;font-weight:bold}
+.empty{text-align:center;color:#777;padding:20px}
+@media(min-width:700px){
+ .products{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .categories{grid-template-columns:repeat(8,1fr)}
+ .product img{height:190px}
+ .hero{padding:45px}
+}
 </style>
 </head>
 <body>
+<div class="top">Welcome to Quojo Phages Online Shop | Shopping made easy in Ghana</div>
 
 <header>
-<h1>QUOJO PHAGES</h1>
-<p>Your Trusted Online Shopping Destination</p>
+ <div class="head">
+  <div class="logo">QUOJO PHAGES<small>ONLINE SHOP</small></div>
+  <div class="search">
+   <input id="search" type="search" placeholder="Search products...">
+   <button onclick="renderProducts()">Search</button>
+  </div>
+  <a href="javascript:void(0)" onclick="openCart()">🛒 Cart (<span id="count">0</span>)</a>
+ </div>
 </header>
 
 <nav>
-<a href="#home">Home</a>
-<a href="#products">Products</a>
-<a href="#contact">Contact</a>
+ <a href="#home">Home</a>
+ <a href="#categories">Categories</a>
+ <a href="#products">All products</a>
+ <a href="#contact">Contact us</a>
 </nav>
 
-<section class="hero" id="home">
-<h2>Welcome to Quojo Phages Online Shop</h2>
-<p>Shop conveniently, enjoy great value and get excellent customer service.</p>
-<button onclick="document.getElementById('products').scrollIntoView()">Shop Now</button>
-</section>
+<main id="home">
+ <section class="hero">
+  <div>
+   <h1>Welcome to Quojo Phages!</h1>
+   <p>Discover great products and enjoy convenient shopping.</p>
+   <a class="shop" href="#products">START SHOPPING</a>
+  </div>
+  <div class="hero-icon">🛍️</div>
+ </section>
 
-<section class="container" id="products">
-<h2 style="text-align:center">Our Products</h2>
-<div class="products">
-<div class="card">
-<h3>Electronics</h3>
-<p>Discover our electronics collection.</p>
-<p>Contact us for prices.</p>
-</div>
-<div class="card">
-<h3>Fashion</h3>
-<p>Explore fashion and accessories.</p>
-<p>Contact us for prices.</p>
-</div>
-<div class="card">
-<h3>Home & Living</h3>
-<p>Find useful items for your home.</p>
-<p>Contact us for prices.</p>
-</div>
-</div>
-</section>
+ <section class="section" id="categories">
+  <h2>Shop by Category</h2>
+  <div class="categories">
+   <div class="category" onclick="choose('Electronics')"><span>📱</span><b>Electronics</b></div>
+   <div class="category" onclick="choose('Fashion')"><span>👕</span><b>Fashion</b></div>
+   <div class="category" onclick="choose('Home')"><span>🏠</span><b>Home</b></div>
+   <div class="category" onclick="choose('Beauty')"><span>💄</span><b>Beauty</b></div>
+   <div class="category" onclick="choose('Accessories')"><span>⌚</span><b>Accessories</b></div>
+   <div class="category" onclick="choose('Groceries')"><span>🛒</span><b>Groceries</b></div>
+   <div class="category" onclick="choose('Sports')"><span>⚽</span><b>Sports</b></div>
+   <div class="category" onclick="choose('Other')"><span>🎁</span><b>Others</b></div>
+  </div>
+ </section>
 
-<section class="contact" id="contact">
-<h2>Contact Quojo Phages</h2>
-<p>Chat with us on WhatsApp to make enquiries and orders.</p>
-<a href="https://wa.me/233556716952" style="color:white">
-<button>Chat on WhatsApp</button>
-</a>
-</section>
+ <section class="section" id="products">
+  <h2>Our Products</h2>
+  <div class="filters">
+   <button class="active" onclick="choose('All',this)">All</button>
+   <button onclick="choose('Electronics',this)">Electronics</button>
+   <button onclick="choose('Fashion',this)">Fashion</button>
+   <button onclick="choose('Home',this)">Home</button>
+   <button onclick="choose('Beauty',this)">Beauty</button>
+   <button onclick="choose('Accessories',this)">Accessories</button>
+   <button onclick="choose('Other',this)">Others</button>
+  </div>
+  <div class="products" id="product-list"></div>
+ </section>
 
-<footer>
-<p>© 2026 Quojo Phages Online Shop. All rights reserved.</p>
+ <div class="banner">
+  <h2>Need help placing an order?</h2>
+  <p>Contact our team on WhatsApp. We will be happy to assist you.</p>
+  <a class="shop" href="https://wa.me/233556716952">CHAT WITH US</a>
+ </div>
+</main>
+
+<footer id="contact">
+ <h3>QUOJO PHAGES ONLINE SHOP</h3>
+ <p>Your trusted shopping destination.</p>
+ <p>WhatsApp: 0556719652</p>
+ <p>Location: Ghana | Currency: GH₵</p>
+ <p>© 2026 Quojo Phages Online Shop</p>
 </footer>
 
+<div class="cart-panel" id="cart">
+ <div class="cart-head">
+  <h2>Your Shopping Cart</h2>
+  <button onclick="closeCart()">×</button>
+ </div>
+ <div id="cart-items"></div>
+ <button class="checkout" onclick="checkout()">Order on WhatsApp</button>
+</div>
+
+<script>
+const products = [
+ {name:"Add your first product",category:"Electronics",image:"https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500"},
+ {name:"Add your product here",category:"Fashion",image:"https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500"},
+ {name:"Add your product here",category:"Home",image:"https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?w=500"},
+ {name:"Add your product here",category:"Beauty",image:"https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=500"},
+ {name:"Add your product here",category:"Accessories",image:"https://images.unsplash.com/photo-1524805444758-089113d48a6d?w=500"},
+ {name:"Add your product here",category:"Groceries",image:"https://images.unsplash.com/photo-1542838132-92c53300491e?w=500"},
+ {name:"Add your product here",category:"Sports",image:"https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=500"},
+ {name:"Add your product here",category:"Other",image:"https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=500"}
+];
+
+let selected="All";
+let cart=[];
+
+function renderProducts(){
+ const query=document.getElementById("search").value.toLowerCase();
+ const filtered=products.filter(p=>
+  (selected==="All"||p.category===selected) &&
+  p.name.toLowerCase().includes(query)
+ );
+ document.getElementById("product-list").innerHTML=filtered.map((p,i)=>`
+  <div class="product">
+   <span class="tag">NEW</span>
+   <img src="${p.image}" alt="${p.name}" onerror="this.style.display='none'">
+   <div class="product-info">
+    <h3>${p.name}</h3>
+    <div class="price">Contact for price</div>
+    <button onclick="addToCart('${p.name}')">Add to Cart</button>
+   </div>
+  </div>`).join("") || "<p>No products found.</p>";
+}
+
+function choose(category,button){
+ selected=category;
+ document.querySelectorAll(".filters button").forEach(b=>b.classList.remove("active"));
+ if(button)button.classList.add("active");
+ else if(category==="All")document.querySelector(".filters button").classList.add("active");
+ renderProducts();
+}
+
+function addToCart(name){
+ cart.push(name);
+ updateCart();
+ alert("Added to your cart!");
+}
+
+function updateCart(){
+ document.getElementById("count").textContent=cart.length;
+ const area=document.getElementById("cart-items");
+ area.innerHTML=cart.length?cart.map((item,i)=>`
+  <div class="cart-item">${item}
+  <button onclick="removeItem(${i})">Remove</button></div>`).join(""):'<div class="empty">Your cart is empty.</div>';
+}
+
+function removeItem(i){cart.splice(i,1);updateCart()}
+function openCart(){document.getElementById("cart").classList.add("open")}
+function closeCart(){document.getElementById("cart").classList.remove("open")}
+
+function checkout(){
+ if(!cart.length){alert("Your cart is empty.");return}
+ const message="Hello Quojo Phages, I want to order:%0A"+cart.map((p,i)=>(i+1)+". "+p).join("%0A");
+ window.open("https://wa.me/233556716952?text="+message,"_blank");
+}
+
+document.getElementById("search").addEventListener("input",renderProducts);
+renderProducts();
+updateCart();
+</script>
 </body>
 </html>
