@@ -1,0 +1,167 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quojo Phages Admin Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{margin:0;font-family:Arial;background:#f5f5f5;color:#292929}
+header{background:#f68b1e;color:white;padding:18px}
+header h2{margin:0}
+main{max-width:900px;margin:25px auto;padding:15px}
+.card{background:white;padding:20px;margin-bottom:18px;border-radius:8px}
+input,button{padding:12px;margin:6px 0;border-radius:5px}
+input{width:100%;box-sizing:border-box;border:1px solid #ddd}
+button{border:0;background:#f68b1e;color:white;font-weight:bold;cursor:pointer}
+.secondary{background:#333}
+.item{padding:12px 0;border-bottom:1px solid #eee}
+.hidden{display:none}
+.note{font-size:13px;color:#666}
+</style>
+</head>
+<body>
+<header>
+<h2>QUOJO PHAGES</h2>
+<p>Administrator Dashboard</p>
+</header>
+<main>
+<section class="card" id="login">
+<h2>Admin Login</h2>
+<input id="email" type="email" placeholder="Your admin email">
+<input id="password" type="password" placeholder="Your password">
+<button onclick="signIn()">Sign in</button>
+<p id="loginMessage" class="note"></p>
+</section>
+
+<section id="dashboard" class="hidden">
+<div class="card">
+<h2>Welcome, Administrator!</h2>
+<p>You are signed in to Quojo Phages Online Shop.</p>
+<button class="secondary" onclick="signOut()">Sign out</button>
+</div>
+
+<div class="card">
+<h2>Seller Stores</h2>
+<button onclick="loadStores()">Refresh sellers</button>
+<div id="stores">Loading...</div>
+</div>
+
+<div class="card">
+<h2>Products</h2>
+<button onclick="loadProducts()">Refresh products</button>
+<div id="products">Loading...</div>
+</div>
+
+<div class="card">
+<h2>Product categories</h2>
+<div id="categories">Loading...</div>
+</div>
+</section>
+</main>
+
+<script>
+const SUPABASE_URL="https://ccyltqbmepftkclzkeui.supabase.co";
+const SUPABASE_KEY="sb_publishable__B512z3E_pMCr2OA6nCr9A_kcpbHbBp";
+
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+async function signIn(){
+ const email=document.getElementById("email").value.trim();
+ const password=document.getElementById("password").value;
+ const message=document.getElementById("loginMessage");
+ message.textContent="Signing in...";
+ const {error}=await db.auth.signInWithPassword({email,password});
+ if(error){message.textContent=error.message;return}
+ await checkAdmin();
+}
+
+async function checkAdmin(){
+ const {data:{user}}=await db.auth.getUser();
+ if(!user){
+  document.getElementById("login").classList.remove("hidden");
+  document.getElementById("dashboard").classList.add("hidden");
+  return;
+ }
+ const {data,error}=await db.from("profiles")
+  .select("role").eq("id",user.id).single();
+
+ if(error||!data||data.role!=="admin"){
+  await db.auth.signOut();
+  document.getElementById("loginMessage").textContent=
+   "Access denied. This account is not an administrator.";
+  return;
+ }
+ document.getElementById("login").classList.add("hidden");
+ document.getElementById("dashboard").classList.remove("hidden");
+ loadStores();
+ loadProducts();
+ loadCategories();
+}
+
+async function loadStores(){
+ const box=document.getElementById("stores");
+ box.textContent="Loading sellers...";
+ const {data,error}=await db.from("stores")
+  .select("id,store_name,status,created_at").order("created_at",{ascending:false});
+ if(error){box.textContent=error.message;return}
+ if(!data.length){box.textContent="No seller stores registered yet.";return}
+ box.innerHTML=data.map(s=>`
+ <div class="item">
+ <strong>${escapeHTML(s.store_name)}</strong>
+ <p>Status: ${escapeHTML(s.status)}</p>
+ ${s.status==="pending"?`<button onclick="approveStore('${s.id}')">Approve seller</button>`:""}
+ </div>`).join("");
+}
+
+async function approveStore(id){
+ const {error}=await db.from("stores")
+  .update({status:"approved"}).eq("id",id);
+ if(error){alert(error.message);return}
+ alert("Seller approved!");
+ loadStores();
+}
+
+async function loadProducts(){
+ const box=document.getElementById("products");
+ box.textContent="Loading products...";
+ const {data,error}=await db.from("products")
+  .select("id,name,selling_price,stock_quantity,is_active")
+  .order("created_at",{ascending:false});
+ if(error){box.textContent=error.message;return}
+ if(!data.length){box.textContent="No products added yet.";return}
+ box.innerHTML=data.map(p=>`
+ <div class="item">
+ <strong>${escapeHTML(p.name)}</strong>
+ <p>Price: GH₵ ${Number(p.selling_price).toFixed(2)}</p>
+ <p>Stock: ${p.stock_quantity} | ${p.is_active?"Active":"Inactive"}</p>
+ </div>`).join("");
+}
+
+async function loadCategories(){
+ const box=document.getElementById("categories");
+ const {data,error}=await db.from("categories").select("name").order("name");
+ if(error){box.textContent=error.message;return}
+ box.textContent=data.map(c=>c.name).join(" • ");
+}
+
+function escapeHTML(value){
+ return String(value??"").replace(/[&<>"']/g,c=>({
+ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ }[c]));
+}
+
+async function signOut(){
+ await db.auth.signOut();
+ location.reload();
+}
+
+db.auth.onAuthStateChange((event,session)=>{
+ if(event==="SIGNED_IN")checkAdmin();
+});
+
+checkAdmin();
+</script>
+</body>
+</html>
