@@ -3,165 +3,394 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quojo Phages Admin Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quojo Phages - Admin Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-body{margin:0;font-family:Arial;background:#f5f5f5;color:#292929}
-header{background:#f68b1e;color:white;padding:18px}
+body{margin:0;font-family:Arial,sans-serif;background:#f5f5f5;color:#222}
+header{background:#f58220;color:white;padding:18px}
 header h2{margin:0}
-main{max-width:900px;margin:25px auto;padding:15px}
-.card{background:white;padding:20px;margin-bottom:18px;border-radius:8px}
-input,button{padding:12px;margin:6px 0;border-radius:5px}
-input{width:100%;box-sizing:border-box;border:1px solid #ddd}
-button{border:0;background:#f68b1e;color:white;font-weight:bold;cursor:pointer}
-.secondary{background:#333}
-.item{padding:12px 0;border-bottom:1px solid #eee}
+main{max-width:1000px;margin:auto;padding:16px}
+section{background:white;padding:16px;margin:15px 0;border-radius:10px;box-shadow:0 2px 8px #ddd}
+input,select,textarea,button{box-sizing:border-box;width:100%;padding:12px;margin:7px 0;border:1px solid #ccc;border-radius:6px;font-size:15px}
+button{background:#f58220;color:white;border:0;font-weight:bold;cursor:pointer}
+button.secondary{background:#333}
+button.danger{background:#b3261e}
+.item{border-bottom:1px solid #ddd;padding:12px 0}
+.item img{width:65px;height:65px;object-fit:cover;border-radius:6px;float:right}
+.small{font-size:13px;color:#666}
 .hidden{display:none}
-.note{font-size:13px;color:#666}
+h3{margin-top:0}
 </style>
 </head>
 <body>
+
 <header>
-<h2>QUOJO PHAGES</h2>
+<h2>Quojo Phages Online Shop</h2>
 <p>Administrator Dashboard</p>
 </header>
+
 <main>
-<section class="card" id="login">
-<h2>Admin Login</h2>
-<input id="email" type="email" placeholder="Your admin email">
-<input id="password" type="password" placeholder="Your password">
-<button onclick="signIn()">Sign in</button>
-<p id="loginMessage" class="note"></p>
+
+<section id="loginBox">
+<h3>Admin Login</h3>
+<input id="email" type="email" placeholder="Admin email">
+<input id="password" type="password" placeholder="Password">
+<button onclick="login()">Login</button>
+<p id="loginMessage"></p>
 </section>
 
-<section id="dashboard" class="hidden">
-<div class="card">
-<h2>Welcome, Administrator!</h2>
-<p>You are signed in to Quojo Phages Online Shop.</p>
-<button class="secondary" onclick="signOut()">Sign out</button>
-</div>
+<div id="dashboard" class="hidden">
 
-<div class="card">
-<h2>Seller Stores</h2>
-<button onclick="loadStores()">Refresh sellers</button>
-<div id="stores">Loading...</div>
-</div>
-
-<div class="card">
-<h2>Products</h2>
-<button onclick="loadProducts()">Refresh products</button>
-<div id="products">Loading...</div>
-</div>
-
-<div class="card">
-<h2>Product categories</h2>
-<div id="categories">Loading...</div>
-</div>
+<section>
+<h3>Welcome, Administrator</h3>
+<button class="secondary" onclick="loadAll()">Refresh Dashboard</button>
+<button class="danger" onclick="logout()">Logout</button>
+<p id="status"></p>
 </section>
+
+<section>
+<h3>Stores</h3>
+<div id="storesList">Loading stores...</div>
+</section>
+
+<section>
+<h3>Add New Product</h3>
+
+<input id="productName" placeholder="Product name">
+
+<textarea id="productDescription" placeholder="Product description"></textarea>
+
+<label>Product category</label>
+<select id="categorySelect">
+<option value="">Loading categories...</option>
+</select>
+
+<label>Approved store</label>
+<select id="storeSelect">
+<option value="">Loading stores...</option>
+</select>
+
+<input id="imageUrl" type="url" placeholder="Product image URL">
+
+<input id="sellingPrice" type="number" min="0" step="0.01" placeholder="Selling price (GH₵)">
+
+<input id="costPrice" type="number" min="0" step="0.01" placeholder="Supplier cost (GH₵)">
+
+<input id="stockQuantity" type="number" min="0" step="1" placeholder="Stock quantity">
+
+<button onclick="addProduct()">Save Product</button>
+<p id="productMessage"></p>
+</section>
+
+<section>
+<h3>All Products</h3>
+<div id="productsList">Loading products...</div>
+</section>
+
+<section>
+<h3>Categories</h3>
+<div id="categoriesList">Loading categories...</div>
+</section>
+
+</div>
 </main>
 
 <script>
-const SUPABASE_URL="https://ccyltqbmepftkclzkeui.supabase.co";
-const SUPABASE_KEY="sb_publishable__B512z3E_pMCr2OA6nCr9A_kcpbHbBp";
+const SUPABASE_URL = "https://ccyltqbmepftkclzkeui.supabase.co";
+const SUPABASE_KEY = "sb_publishable__B512z3E_pMCr2OA6nCr9A_kcpbHbBp";
 
-const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-async function signIn(){
- const email=document.getElementById("email").value.trim();
- const password=document.getElementById("password").value;
- const message=document.getElementById("loginMessage");
- message.textContent="Signing in...";
- const {error}=await db.auth.signInWithPassword({email,password});
- if(error){message.textContent=error.message;return}
- await checkAdmin();
+let currentUser = null;
+
+function message(id, text) {
+  document.getElementById(id).textContent = text;
 }
 
-async function checkAdmin(){
- const {data:{user}}=await db.auth.getUser();
- if(!user){
-  document.getElementById("login").classList.remove("hidden");
-  document.getElementById("dashboard").classList.add("hidden");
-  return;
- }
- const {data,error}=await db.from("profiles")
-  .select("role").eq("id",user.id).single();
+async function login() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
 
- if(error||!data||data.role!=="admin"){
+  message("loginMessage", "Signing in...");
+
+  const { data, error } = await db.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    message("loginMessage", error.message);
+    return;
+  }
+
+  currentUser = data.user;
+  await checkAdmin();
+}
+
+async function checkAdmin() {
+  const { data: profile, error } = await db
+    .from("profiles")
+    .select("role")
+    .eq("id", currentUser.id)
+    .single();
+
+  if (error || !profile || profile.role !== "admin") {
+    message("loginMessage", "Access denied. This account is not an administrator.");
+    await db.auth.signOut();
+    return;
+  }
+
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("dashboard").classList.remove("hidden");
+
+  message("status", "Administrator access confirmed.");
+  await loadAll();
+}
+
+async function loadAll() {
+  await Promise.all([
+    loadStores(),
+    loadCategories(),
+    loadProducts()
+  ]);
+}
+
+async function loadStores() {
+  const { data, error } = await db
+    .from("stores")
+    .select("id, store_name, status")
+    .order("store_name");
+
+  if (error) {
+    message("storesList", error.message);
+    return;
+  }
+
+  const list = document.getElementById("storesList");
+  const select = document.getElementById("storeSelect");
+
+  list.innerHTML = "";
+  select.innerHTML = '<option value="">Choose approved store</option>';
+
+  (data || []).forEach(store => {
+    const item = document.createElement("div");
+    item.className = "item";
+
+    const name = document.createElement("strong");
+    name.textContent = store.store_name + " ";
+
+    const status = document.createElement("span");
+    status.textContent = "(" + store.status + ")";
+
+    item.append(name, status);
+
+    if (store.status === "pending") {
+      const approve = document.createElement("button");
+      approve.textContent = "Approve Store";
+      approve.onclick = () => approveStore(store.id);
+      item.appendChild(approve);
+    }
+
+    list.appendChild(item);
+
+    if (store.status === "approved") {
+      const option = document.createElement("option");
+      option.value = store.id;
+      option.textContent = store.store_name;
+      select.appendChild(option);
+    }
+  });
+
+  if (!data || data.length === 0) {
+    list.textContent = "No stores registered yet.";
+  }
+}
+
+async function approveStore(id) {
+  if (!confirm("Approve this store?")) return;
+
+  const { error } = await db
+    .from("stores")
+    .update({ status: "approved" })
+    .eq("id", id);
+
+  if (error) {
+    alert("Could not approve store: " + error.message);
+    return;
+  }
+
+  alert("Store approved.");
+  await loadStores();
+}
+
+async function loadCategories() {
+  const { data, error } = await db
+    .from("categories")
+    .select("id, name")
+    .order("name");
+
+  if (error) {
+    message("categoriesList", error.message);
+    return;
+  }
+
+  const select = document.getElementById("categorySelect");
+  const list = document.getElementById("categoriesList");
+
+  select.innerHTML = '<option value="">Choose category</option>';
+  list.innerHTML = "";
+
+  (data || []).forEach(category => {
+    const option = document.createElement("option");
+    option.value = category.id;
+    option.textContent = category.name;
+    select.appendChild(option);
+
+    const item = document.createElement("div");
+    item.className = "item";
+    item.textContent = category.name;
+    list.appendChild(item);
+  });
+
+  if (!data || data.length === 0) {
+    list.textContent = "No categories found.";
+  }
+}
+
+async function addProduct() {
+  const name = document.getElementById("productName").value.trim();
+  const description = document.getElementById("productDescription").value.trim();
+  const categoryId = document.getElementById("categorySelect").value;
+  const storeId = document.getElementById("storeSelect").value;
+  const imageUrl = document.getElementById("imageUrl").value.trim();
+  const sellingPrice = Number(document.getElementById("sellingPrice").value);
+  const costPrice = Number(document.getElementById("costPrice").value);
+  const stock = Number(document.getElementById("stockQuantity").value);
+
+  if (!name || !categoryId || !storeId || !sellingPrice ||
+      document.getElementById("sellingPrice").value === "" ||
+      document.getElementById("costPrice").value === "" ||
+      document.getElementById("stockQuantity").value === "" ||
+      sellingPrice < 0 || costPrice < 0 || stock < 0 ||
+      !Number.isInteger(stock)) {
+    message("productMessage", "Please complete all required fields with valid amounts.");
+    return;
+  }
+
+  if (imageUrl) {
+    try {
+      const url = new URL(imageUrl);
+      if (url.protocol !== "https:" && url.protocol !== "http:") {
+        throw new Error("Invalid image URL");
+      }
+    } catch {
+      message("productMessage", "Please enter a valid image URL.");
+      return;
+    }
+  }
+
+  message("productMessage", "Saving product...");
+
+  const { data: product, error } = await db
+    .from("products")
+    .insert({
+      store_id: storeId,
+      category_id: categoryId,
+      name,
+      description,
+      image_url: imageUrl || null,
+      selling_price: sellingPrice,
+      stock_quantity: stock,
+      is_active: true
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    message("productMessage", "Product could not be saved: " + error.message);
+    return;
+  }
+
+  const { error: costError } = await db
+    .from("product_costs")
+    .insert({
+      product_id: product.id,
+      cost_price: costPrice
+    });
+
+  if (costError) {
+    message("productMessage", "Product was created, but its cost could not be saved. Contact support. " + costError.message);
+    return;
+  }
+
+  message("productMessage", "Product added successfully!");
+
+  document.getElementById("productName").value = "";
+  document.getElementById("productDescription").value = "";
+  document.getElementById("imageUrl").value = "";
+  document.getElementById("sellingPrice").value = "";
+  document.getElementById("costPrice").value = "";
+  document.getElementById("stockQuantity").value = "";
+
+  await loadProducts();
+}
+
+async function loadProducts() {
+  const { data, error } = await db
+    .from("products")
+    .select("id, name, selling_price, stock_quantity, image_url, is_active")
+    .order("name");
+
+  const list = document.getElementById("productsList");
+  list.innerHTML = "";
+
+  if (error) {
+    list.textContent = "Could not load products: " + error.message;
+    return;
+  }
+
+  (data || []).forEach(product => {
+    const item = document.createElement("div");
+    item.className = "item";
+
+    if (product.image_url) {
+      const img = document.createElement("img");
+      img.src = product.image_url;
+      img.alt = product.name;
+      item.appendChild(img);
+    }
+
+    const title = document.createElement("strong");
+    title.textContent = product.name;
+
+    const details = document.createElement("p");
+    details.textContent =
+      "Price: GH₵" + Number(product.selling_price).toFixed(2) +
+      " | Stock: " + product.stock_quantity +
+      " | " + (product.is_active ? "Active" : "Inactive");
+
+    item.append(title, details);
+    list.appendChild(item);
+  });
+
+  if (!data || data.length === 0) {
+    list.textContent = "No products have been added yet.";
+  }
+}
+
+async function logout() {
   await db.auth.signOut();
-  document.getElementById("loginMessage").textContent=
-   "Access denied. This account is not an administrator.";
-  return;
- }
- document.getElementById("login").classList.add("hidden");
- document.getElementById("dashboard").classList.remove("hidden");
- loadStores();
- loadProducts();
- loadCategories();
+  location.reload();
 }
 
-async function loadStores(){
- const box=document.getElementById("stores");
- box.textContent="Loading sellers...";
- const {data,error}=await db.from("stores")
-  .select("id,store_name,status,created_at").order("created_at",{ascending:false});
- if(error){box.textContent=error.message;return}
- if(!data.length){box.textContent="No seller stores registered yet.";return}
- box.innerHTML=data.map(s=>`
- <div class="item">
- <strong>${escapeHTML(s.store_name)}</strong>
- <p>Status: ${escapeHTML(s.status)}</p>
- ${s.status==="pending"?`<button onclick="approveStore('${s.id}')">Approve seller</button>`:""}
- </div>`).join("");
-}
-
-async function approveStore(id){
- const {error}=await db.from("stores")
-  .update({status:"approved"}).eq("id",id);
- if(error){alert(error.message);return}
- alert("Seller approved!");
- loadStores();
-}
-
-async function loadProducts(){
- const box=document.getElementById("products");
- box.textContent="Loading products...";
- const {data,error}=await db.from("products")
-  .select("id,name,selling_price,stock_quantity,is_active")
-  .order("created_at",{ascending:false});
- if(error){box.textContent=error.message;return}
- if(!data.length){box.textContent="No products added yet.";return}
- box.innerHTML=data.map(p=>`
- <div class="item">
- <strong>${escapeHTML(p.name)}</strong>
- <p>Price: GH₵ ${Number(p.selling_price).toFixed(2)}</p>
- <p>Stock: ${p.stock_quantity} | ${p.is_active?"Active":"Inactive"}</p>
- </div>`).join("");
-}
-
-async function loadCategories(){
- const box=document.getElementById("categories");
- const {data,error}=await db.from("categories").select("name").order("name");
- if(error){box.textContent=error.message;return}
- box.textContent=data.map(c=>c.name).join(" • ");
-}
-
-function escapeHTML(value){
- return String(value??"").replace(/[&<>"']/g,c=>({
- "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
- }[c]));
-}
-
-async function signOut(){
- await db.auth.signOut();
- location.reload();
-}
-
-db.auth.onAuthStateChange((event,session)=>{
- if(event==="SIGNED_IN")checkAdmin();
+db.auth.getSession().then(async ({ data }) => {
+  if (data.session) {
+    currentUser = data.session.user;
+    await checkAdmin();
+  }
 });
-
-checkAdmin();
 </script>
+
 </body>
 </html>
