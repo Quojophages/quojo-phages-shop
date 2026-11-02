@@ -187,3 +187,84 @@ updateCart();
 </script>
 </body>
 </html>
+<!-- QUOJO PHAGES PRODUCT IMAGE UPLOADER -->
+<div style="padding:20px;margin:20px 0;background:#fff7ed;border:1px solid #f97316;border-radius:12px;">
+  <h2>Upload Product Image</h2>
+  <p>Select a product photo. The system will upload it and generate its image URL.</p>
+
+  <input type="file" id="quojoImageFile" accept="image/jpeg,image/png,image/webp">
+
+  <button type="button" id="quojoUploadBtn"
+    style="background:#f97316;color:white;padding:12px;border:0;border-radius:8px;margin-top:12px;">
+    Upload Image
+  </button>
+
+  <p id="quojoUploadStatus"></p>
+  <input id="quojoImageUrl" readonly placeholder="Your image URL will appear here"
+    style="width:100%;padding:10px;box-sizing:border-box;">
+
+  <button type="button" id="quojoCopyUrl"
+    style="padding:10px;margin-top:8px;">
+    Copy Image URL
+  </button>
+</div>
+
+<script>
+document.getElementById("quojoUploadBtn").addEventListener("click", async function () {
+  const file = document.getElementById("quojoImageFile").files[0];
+  const status = document.getElementById("quojoUploadStatus");
+  const urlField = document.getElementById("quojoImageUrl");
+
+  if (!file) {
+    status.textContent = "Please select an image first.";
+    return;
+  }
+
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    status.textContent = "Please select a JPG, PNG or WebP image.";
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    status.textContent = "Image must be smaller than 5 MB.";
+    return;
+  }
+
+  const fileName = Date.now() + "-" +
+    file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+
+  status.textContent = "Uploading image...";
+  this.disabled = true;
+
+  try {
+    const { error } = await db.storage
+      .from("product-images")
+      .upload(fileName, file);
+
+    if (error) throw error;
+
+    const { data } = db.storage
+      .from("product-images")
+      .getPublicUrl(fileName);
+
+    urlField.value = data.publicUrl;
+    status.textContent = "Image uploaded successfully!";
+  } catch (error) {
+    status.textContent = "Upload failed: " + error.message;
+  } finally {
+    this.disabled = false;
+  }
+});
+
+document.getElementById("quojoCopyUrl").addEventListener("click", async function () {
+  const url = document.getElementById("quojoImageUrl").value;
+
+  if (!url) {
+    alert("Upload an image first.");
+    return;
+  }
+
+  await navigator.clipboard.writeText(url);
+  alert("Image URL copied!");
+});
+</script>
