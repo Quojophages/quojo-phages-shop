@@ -5,47 +5,58 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quojo Phages Online Shop</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+:root{--orange:#f58220;--navy:#10243a;--bg:#f4f5f7}
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f4f5f7;color:#222}
-header{background:#10243a;color:white;padding:15px}
+body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:#222}
+header{background:var(--navy);color:white;padding:14px;position:sticky;top:0;z-index:10}
 .top{max-width:1200px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.logo{font-size:22px;font-weight:bold}.logo span{color:#ff8a24}
+.logo{font-size:22px;font-weight:bold}.logo span{color:var(--orange)}
 .search{display:flex;flex:1;max-width:550px}
 .search input{width:100%;padding:12px;border:0;border-radius:5px 0 0 5px}
-.search button{background:#f58220;color:white;border:0;padding:12px;border-radius:0 5px 5px 0}
-.cart{background:#f58220;color:white;padding:11px;border:0;border-radius:5px}
-main{max-width:1200px;margin:auto;padding:15px}
-.hero{background:linear-gradient(110deg,#10243a,#315c7b);color:white;padding:40px 25px;border-radius:10px;margin:10px 0 22px}
-.hero h1{font-size:32px;margin:0 0 10px}
+.search button,.orange{background:var(--orange);color:white;border:0;padding:12px;border-radius:5px;cursor:pointer}
+.search button{border-radius:0 5px 5px 0}
+.top button{cursor:pointer}
+.hero{background:linear-gradient(110deg,#10243a,#315c7b);color:white;padding:42px 25px;border-radius:10px;margin:15px 0 22px}
+.hero h1{font-size:32px;margin:0 0 12px}
 .hero p{font-size:17px}
-.hero a{display:inline-block;background:#f58220;color:white;padding:12px 20px;text-decoration:none;border-radius:5px}
-h2{font-size:21px}
+.hero a{display:inline-block;background:var(--orange);color:white;padding:12px 20px;text-decoration:none;border-radius:5px}
+main{max-width:1200px;margin:auto;padding:15px}
 .categories{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px}
 .category{background:white;border:1px solid #ddd;padding:12px 17px;border-radius:6px;white-space:nowrap;cursor:pointer}
-.category.active{background:#f58220;color:white}
+.category.active{background:var(--orange);color:white}
 .products{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .product{background:white;border-radius:8px;overflow:hidden;box-shadow:0 2px 7px #0001}
-.product img{width:100%;height:160px;object-fit:contain;padding:10px}
+.product img{width:100%;height:165px;object-fit:contain;padding:10px}
 .info{padding:12px}
 .info h3{font-size:15px;min-height:35px}
-.price{color:#f58220;font-weight:bold;font-size:19px}
-.add{width:100%;padding:11px;background:#f58220;color:white;border:0;border-radius:5px}
-footer{background:#10243a;color:white;text-align:center;padding:28px;margin-top:35px}
-footer a{color:#ffad64}
+.price{color:var(--orange);font-weight:bold;font-size:19px}
+.add{width:100%;padding:11px;background:var(--orange);color:white;border:0;border-radius:5px;cursor:pointer}
+.stock{font-size:13px;color:#666}
 .empty{background:white;padding:25px;text-align:center;grid-column:1/-1}
+footer{background:var(--navy);color:white;text-align:center;padding:28px;margin-top:35px}
+footer a{color:#ffad64}
+.modal{display:none;position:fixed;inset:0;background:#0009;z-index:30;align-items:center;justify-content:center;padding:15px}
+.modal-box{background:white;width:100%;max-width:420px;padding:22px;border-radius:10px;max-height:90vh;overflow:auto}
+.modal-box input{width:100%;padding:12px;margin:7px 0 13px;border:1px solid #ccc;border-radius:5px}
+.modal-box button{width:100%;margin:5px 0}
+.close{background:#ddd;color:#222;border:0;padding:10px;border-radius:5px}
+.notice{font-size:13px;color:#666}
 @media(max-width:700px){.products{grid-template-columns:repeat(2,1fr)}.hero h1{font-size:25px}}
 </style>
 </head>
 <body>
+
 <header>
 <div class="top">
 <div class="logo">QUOJO <span>PHAGES</span></div>
 <div class="search">
-<input id="search" placeholder="Search for products..." oninput="render()">
-<button onclick="render()">Search</button>
+<input id="search" placeholder="Search for products..." oninput="renderProducts()">
+<button onclick="renderProducts()">Search</button>
 </div>
-<button class="cart" onclick="showCart()">🛒 Cart (<span id="count">0</span>)</button>
+<button class="orange" onclick="openAccount()">👤 Account</button>
+<button class="orange" onclick="showCart()">🛒 Cart (<span id="count">0</span>)</button>
 </div>
 </header>
 
@@ -58,7 +69,7 @@ footer a{color:#ffad64}
 
 <h2>Shop by Category</h2>
 <div class="categories" id="categories">
-<button class="category active" onclick="filter('All',this)">All Products</button>
+<button class="category active" onclick="filterCategory('All',this)">All Products</button>
 </div>
 
 <section id="shop">
@@ -69,6 +80,31 @@ footer a{color:#ffad64}
 </section>
 </main>
 
+<div class="modal" id="accountModal">
+<div class="modal-box">
+<h2 id="accountTitle">Customer Account</h2>
+<div id="accountForm">
+<label>Full name (for registration)</label>
+<input id="fullName" placeholder="Your full name">
+<label>Email address</label>
+<input id="email" type="email" placeholder="you@example.com">
+<label>Phone number (optional)</label>
+<input id="phone" type="tel" placeholder="+233...">
+<label>Password</label>
+<input id="password" type="password" placeholder="At least 6 characters">
+<button class="orange" onclick="register()">Create Account</button>
+<button class="orange" onclick="login()">Log In</button>
+<p class="notice">Registration uses email and password. You can add phone verification later after setting up an SMS provider.</p>
+</div>
+<div id="loggedIn" style="display:none">
+<p id="welcome"></p>
+<button class="orange" onclick="logout()">Log Out</button>
+</div>
+<button class="close" onclick="closeAccount()">Close</button>
+<p id="accountMessage" class="notice"></p>
+</div>
+</div>
+
 <footer>
 <h2>QUOJO PHAGES ONLINE SHOP</h2>
 <p>Shop Smart. Live Better.</p>
@@ -76,113 +112,174 @@ footer a{color:#ffad64}
 <p>© 2026 Quojo Phages Online Shop</p>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const db=supabase.createClient(
-"https://ccyltqbmepftkclzkeui.supabase.co",
-"sb_publishable__B512z3E_pMCr2OA6nCr9A_kcpbHbBp"
+const db = supabase.createClient(
+ "https://ccyltqbmepftkclzkeui.supabase.co",
+ "sb_publishable__B512z3E_pMCr2OA6nCr9A_kcpbHbBp"
 );
-let products=[];
-let category="All";
+
+let allProducts=[];
+let selectedCategory="All";
 let cart=JSON.parse(localStorage.getItem("quojoCart")||"[]");
 
-async function load(){
-const box=document.getElementById("products");
-try{
-const {data,error}=await db.from("products")
-.select("id,name,selling_price,stock_quantity,image_url,category_id")
-.eq("is_active",true);
-if(error)throw error;
-products=data||[];
-render();
-loadCategories();
-}catch(e){
-box.innerHTML='<div class="empty">Products could not load. Please check your database permissions.</div>';
-console.error(e);
+function escapeHTML(value){
+ return String(value??"").replace(/[&<>"']/g,c=>({
+ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ }[c]));
 }
+
+async function loadProducts(){
+ const box=document.getElementById("products");
+ try{
+  const {data,error}=await db.from("products")
+   .select("id,name,description,selling_price,stock_quantity,image_url,category_id")
+   .eq("is_active",true)
+   .order("created_at",{ascending:false});
+  if(error)throw error;
+  allProducts=data||[];
+  renderProducts();
+  loadCategories();
+ }catch(error){
+  box.innerHTML='<div class="empty">Products could not load. Please check database permissions.</div>';
+  console.error(error);
+ }
 }
 
 async function loadCategories(){
-const {data,error}=await db.from("categories").select("*").order("name");
-if(error||!data)return;
-const box=document.getElementById("categories");
-data.forEach(c=>{
-const b=document.createElement("button");
-b.className="category";
-b.textContent=c.name;
-b.onclick=()=>filter(c.id,b);
-box.appendChild(b);
-});
+ const {data,error}=await db.from("categories").select("*").order("name");
+ if(error||!data)return;
+ const box=document.getElementById("categories");
+ data.forEach(c=>{
+  const b=document.createElement("button");
+  b.className="category";
+  b.textContent=c.name;
+  b.onclick=()=>filterCategory(c.id,b);
+  box.appendChild(b);
+ });
 }
 
-function filter(value,button){
-category=value;
-document.querySelectorAll(".category").forEach(b=>b.classList.remove("active"));
-button.classList.add("active");
-render();
+function filterCategory(value,button){
+ selectedCategory=value;
+ document.querySelectorAll(".category").forEach(b=>b.classList.remove("active"));
+ button.classList.add("active");
+ renderProducts();
 }
 
-function render(){
-const term=document.getElementById("search").value.toLowerCase();
-const list=products.filter(p=>
-(category==="All"||p.category_id===category)&&
-(p.name||"").toLowerCase().includes(term)
-);
-const box=document.getElementById("products");
-if(!list.length){
-box.innerHTML='<div class="empty">No products available yet. Please check back soon.</div>';
-return;
-}
-box.innerHTML=list.map(p=>`
-<div class="product">
-<img src="${safe(p.image_url||"https://placehold.co/300x200?text=Quojo+Product")}" alt="${safe(p.name)}">
-<div class="info">
-<h3>${safe(p.name)}</h3>
-<div class="price">GH₵ ${Number(p.selling_price).toFixed(2)}</div>
-<p>${Number(p.stock_quantity)>0?"In stock":"Out of stock"}</p>
-<button class="add" ${Number(p.stock_quantity)<=0?"disabled":""} onclick="add('${p.id}')">Add to Cart</button>
-</div>
-</div>`).join("");
-}
-
-function safe(s){
-return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function renderProducts(){
+ const term=document.getElementById("search").value.toLowerCase();
+ const list=allProducts.filter(p=>
+  (selectedCategory==="All"||p.category_id===selectedCategory)&&
+  (p.name||"").toLowerCase().includes(term)
+ );
+ const box=document.getElementById("products");
+ if(!list.length){
+  box.innerHTML='<div class="empty">No products found.</div>';
+  return;
+ }
+ box.innerHTML=list.map(p=>`
+ <article class="product">
+  <img src="${escapeHTML(p.image_url||"https://placehold.co/300x200?text=Quojo")}" alt="${escapeHTML(p.name)}">
+  <div class="info">
+   <h3>${escapeHTML(p.name)}</h3>
+   <div class="price">GH₵ ${Number(p.selling_price).toFixed(2)}</div>
+   <p class="stock">${Number(p.stock_quantity)>0?"In stock: "+p.stock_quantity:"Out of stock"}</p>
+   <button class="add" ${Number(p.stock_quantity)<=0?"disabled":""} onclick="addToCart('${p.id}')">Add to Cart</button>
+  </div>
+ </article>`).join("");
 }
 
-function add(id){
-const p=products.find(x=>x.id===id);
-if(!p)return;
-const item=cart.find(x=>x.id===id);
-if(item)item.quantity++;
-else cart.push({...p,quantity:1});
-save();
-alert("Added to cart!");
+function addToCart(id){
+ const p=allProducts.find(x=>x.id===id);
+ if(!p)return;
+ const item=cart.find(x=>x.id===id);
+ if(item){
+  if(item.quantity>=Number(p.stock_quantity)){
+   alert("No more stock available.");
+   return;
+  }
+  item.quantity++;
+ }else cart.push({...p,quantity:1});
+ saveCart();
+ alert("Product added to your cart!");
 }
 
-function save(){
-localStorage.setItem("quojoCart",JSON.stringify(cart));
-document.getElementById("count").textContent=cart.reduce((n,p)=>n+p.quantity,0);
+function saveCart(){
+ localStorage.setItem("quojoCart",JSON.stringify(cart));
+ document.getElementById("count").textContent=cart.reduce((n,p)=>n+p.quantity,0);
 }
 
 function showCart(){
-if(!cart.length){alert("Your cart is empty.");return;}
-let message="Hello Quojo Phages, I want to order:\n\n";
-cart.forEach(p=>message+=p.name+" x "+p.quantity+" = GH₵ "+(p.selling_price*p.quantity).toFixed(2)+"\n");
-message+="\nTotal: GH₵ "+cart.reduce((n,p)=>n+p.quantity*p.selling_price,0).toFixed(2);
-if(confirm(message+"\n\nContinue to WhatsApp?")){
-window.open("https://wa.me/233556719652?text="+encodeURIComponent(message),"_blank");
-}
+ if(!cart.length){alert("Your cart is empty.");return;}
+ let message="Hello Quojo Phages Online Shop, I want to order:\n\n";
+ cart.forEach(p=>message+=p.name+" x "+p.quantity+" = GH₵ "+(p.selling_price*p.quantity).toFixed(2)+"\n");
+ const total=cart.reduce((n,p)=>n+p.selling_price*p.quantity,0);
+ message+="\nTotal: GH₵ "+total.toFixed(2);
+ if(confirm(message+"\n\nContinue to WhatsApp?")){
+  window.open("https://wa.me/233556719652?text="+encodeURIComponent(message),"_blank");
+ }
 }
 
-save();
-load();
+function openAccount(){
+ document.getElementById("accountModal").style.display="flex";
+ checkSession();
+}
+function closeAccount(){
+ document.getElementById("accountModal").style.display="none";
+}
+
+async function register(){
+ const fullName=document.getElementById("fullName").value.trim();
+ const email=document.getElementById("email").value.trim();
+ const phone=document.getElementById("phone").value.trim();
+ const password=document.getElementById("password").value;
+ const msg=document.getElementById("accountMessage");
+ if(!fullName||!email||password.length<6){
+  msg.textContent="Enter your name, email and a password of at least 6 characters.";
+  return;
+ }
+ msg.textContent="Creating your account...";
+ const {data,error}=await db.auth.signUp({
+  email,password,
+  options:{data:{full_name:fullName,phone}}
+ });
+ if(error){msg.textContent=error.message;return;}
+ msg.textContent=data.session?
+  "Account created successfully!":
+  "Account created. Check your email for a verification link.";
+}
+
+async function login(){
+ const email=document.getElementById("email").value.trim();
+ const password=document.getElementById("password").value;
+ const msg=document.getElementById("accountMessage");
+ if(!email||!password){msg.textContent="Enter your email and password.";return;}
+ msg.textContent="Logging in...";
+ const {error}=await db.auth.signInWithPassword({email,password});
+ if(error){msg.textContent=error.message;return;}
+ msg.textContent="Welcome back!";
+ checkSession();
+}
+
+async function logout(){
+ const {error}=await db.auth.signOut();
+ document.getElementById("accountMessage").textContent=error?error.message:"You have logged out.";
+ checkSession();
+}
+
+async function checkSession(){
+ const {data}=await db.auth.getSession();
+ const session=data.session;
+ document.getElementById("accountForm").style.display=session?"none":"block";
+ document.getElementById("loggedIn").style.display=session?"block":"none";
+ if(session){
+  document.getElementById("welcome").textContent="Welcome, "+(session.user.user_metadata.full_name||session.user.email);
+ }
+}
+
+db.auth.onAuthStateChange(()=>checkSession());
+
+saveCart();
+loadProducts();
 </script>
 </body>
 </html>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-const db = supabase.createClient(
-  "https://ccyltqbmepftkclzkeui.supabase.co",
-  "sb_publishable__B512z3E_pMCr2OA6nCr9A_kcpbHbBp"
-);
-</script>
