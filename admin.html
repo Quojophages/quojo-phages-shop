@@ -595,6 +595,129 @@ async function loadOrders() {
     card.appendChild(save);
     list.appendChild(card);
   });
-}</script>
+}// NEW ORDER DASHBOARD NOTIFICATIONS
+let orderNotificationStarted = false;
+let knownOrderIds = new Set();
+let lastOrderCheck = null;
+
+function addOrderNotificationBox() {
+  if (document.getElementById("orderNotifications")) return;
+
+  const section = document.createElement("section");
+  section.id = "orderNotifications";
+
+  const heading = document.createElement("h3");
+  heading.textContent = "New Order Notifications";
+
+  const status = document.createElement("p");
+  status.id = "notificationStatus";
+  status.textContent = "Preparing notifications...";
+
+  const enableButton = document.createElement("button");
+  enableButton.className = "secondary";
+  enableButton.textContent = "Enable Browser Notifications";
+
+  enableButton.onclick = async () => {
+    if (!("Notification" in window)) {
+      status.textContent = "Browser notifications are not supported here.";
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    status.textContent = permission === "granted"
+      ? "Browser notifications enabled."
+      : "Notifications were not enabled. Check your browser settings.";
+  };
+
+  const alerts = document.createElement("div");
+  alerts.id = "newOrderAlerts";
+
+  section.append(heading, status, enableButton, alerts);
+  document.getElementById("dashboard").prepend(section);
+}
+
+async function checkForNewOrders() {
+  if (!currentUser ||
+      document.getElementById("dashboard").classList.contains("hidden")) {
+    return;
+  }
+
+  const checkStarted = new Date().toISOString();
+
+  let query = db
+    .from("orders")
+    .select("id, total_amount, created_at")
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (lastOrderCheck) {
+    query = query.gt("created_at", lastOrderCheck);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    document.getElementById("notificationStatus").textContent =
+      "Could not check new orders: " + error.message;
+    return;
+  }
+
+  const orders = data || [];
+
+  if (lastOrderCheck === null) {
+    orders.forEach(order => knownOrderIds.add(order.id));
+    lastOrderCheck = checkStarted;
+    document.getElementById("notificationStatus").textContent =
+      "Notifications are active. Checking every 30 seconds.";
+    return;
+  }
+
+  const newOrders = orders.filter(order => !knownOrderIds.has(order.id));
+
+  orders.forEach(order => knownOrderIds.add(order.id));
+  lastOrderCheck = checkStarted;
+
+  newOrders.reverse().forEach(order => {
+    const alerts = document.getElementById("newOrderAlerts");
+    const alertItem = document.createElement("p");
+
+    alertItem.textContent =
+      "New order received! GH₵" +
+      Number(order.total_amount).toFixed(2);
+
+    alerts.prepend(alertItem);
+
+    if ("Notification" in window &&
+        Notification.permission === "granted") {
+      new Notification("New Quojo Phages Shop Order", {
+        body: "A new order worth GH₵" +
+          Number(order.total_amount).toFixed(2) + " has arrived."
+      });
+    }
+
+    loadOrders();
+  });
+}
+
+function startOrderNotifications() {
+  if (orderNotificationStarted) return;
+
+  addOrderNotificationBox();
+  orderNotificationStarted = true;
+
+  checkForNewOrders();
+  setInterval(checkForNewOrders, 30000);
+}
+
+const previousCheckAdmin = checkAdmin;
+
+checkAdmin = async function () {
+  await previousCheckAdmin();
+
+  if (!document.getElementById("dashboard").classList.contains("hidden")) {
+    startOrderNotifications();
+  }
+};</script>
 </body>
 </html>
