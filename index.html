@@ -598,8 +598,7 @@ async function checkSession(){
 
  try{
   const {data:sessionData,error:sessionError}=await db.auth.getSession();
-  if(errorSession)throw errorSession;
-
+  if(sessionError)throw sessionError;
   if(!sessionData.session){
    throw new Error("Your session has expired. Please log in again.");
   }
