@@ -348,3 +348,314 @@ loadProducts();
 </script>
 </body>
 </html>
+const db = supabase.createClient(
+ "https://ccyltqbmepftkclzkeui.supabase.co",
+ "sb_publishable__B512z3E_pMCr2OA6nCr9A_kcpbHbBp"
+);
+
+let allProducts=[];
+let selectedCategory="All";
+let cart=JSON.parse(localStorage.getItem("quojoCart")||"[]");
+
+function escapeHTML(value){
+ return String(value??"").replace(/[&<>"']/g,c=>({
+ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ }[c]));
+}
+
+async function loadProducts(){
+ const box=document.getElementById("products");
+ try{
+  const {data,error}=await db.from("products")
+   .select("id,name,description,selling_price,stock_quantity,image_url,category_id")
+   .eq("is_active",true)
+   .order("created_at",{ascending:false});
+  if(error)throw error;
+  allProducts=data||[];
+  renderProducts();
+  loadCategories();
+ }catch(error){
+  box.innerHTML='<div class="empty">Products could not load. Please check database permissions.</div>';
+  console.error(error);
+ }
+}
+
+async function loadCategories(){
+ const {data,error}=await db.from("categories").select("*").order("name");
+ if(error||!data)return;
+ const box=document.getElementById("categories");
+ data.forEach(c=>{
+  const b=document.createElement("button");
+  b.className="category";
+  b.textContent=c.name;
+  b.onclick=()=>filterCategory(c.id,b);
+  box.appendChild(b);
+ });
+}
+
+function filterCategory(value,button){
+ selectedCategory=value;
+ document.querySelectorAll(".category").forEach(b=>b.classList.remove("active"));
+ button.classList.add("active");
+ renderProducts();
+}
+
+function renderProducts(){
+ const term=document.getElementById("search").value.toLowerCase();
+ const list=allProducts.filter(p=>
+  (selectedCategory==="All"||p.category_id===selectedCategory)&&
+  (p.name||"").toLowerCase().includes(term)
+ );
+ const box=document.getElementById("products");
+
+ if(!list.length){
+  box.innerHTML='<div class="empty">No products found.</div>';
+  return;
+ }
+
+ box.innerHTML=list.map(p=>`
+ <article class="product">
+  <img src="${escapeHTML(p.image_url||"https://placehold.co/300x200?text=Quojo")}" alt="${escapeHTML(p.name)}">
+  <div class="info">
+   <h3>${escapeHTML(p.name)}</h3>
+   <div class="price">GH₵ ${Number(p.selling_price).toFixed(2)}</div>
+   <p class="stock">${Number(p.stock_quantity)>0?"In stock: "+p.stock_quantity:"Out of stock"}</p>
+   <button class="add" ${Number(p.stock_quantity)<=0?"disabled":""} onclick="addToCart('${p.id}')">Add to Cart</button>
+  </div>
+ </article>`).join("");
+}
+
+function addToCart(id){
+ const p=allProducts.find(x=>x.id===id);
+ if(!p)return;
+
+ const item=cart.find(x=>x.id===id);
+
+ if(item){
+  if(item.quantity>=Number(p.stock_quantity)){
+   alert("No more stock available.");
+   return;
+  }
+  item.quantity++;
+ }else{
+  cart.push({...p,quantity:1});
+ }
+
+ saveCart();
+ alert("Product added to your cart!");
+}
+
+function saveCart(){
+ localStorage.setItem("quojoCart",JSON.stringify(cart));
+ document.getElementById("count").textContent=
+  cart.reduce((n,p)=>n+p.quantity,0);
+}
+
+async function showCart(){
+ const {data:authData,error:authError}=await db.auth.getSession();
+
+ if(authError){
+  alert("Could not verify your login. Please try again.");
+  return;
+ }
+
+ if(!authData.session){
+  openAccount();
+  document.getElementById("accountMessage").textContent=
+   "Please log in or create an account before checkout.";
+  return;
+ }
+
+ if(!cart.length){
+  alert("Your cart is empty.");
+  return;
+ }
+
+ const total=cart.reduce((n,p)=>
+  n+Number(p.selling_price)*p.quantity,0);
+
+ document.getElementById("checkoutTotal").textContent=
+  "Order total: GH₵ "+total.toFixed(2);
+
+ document.getElementById("checkoutMessage").textContent="";
+ document.getElementById("placeOrderButton").disabled=false;
+ document.getElementById("checkoutModal").style.display="flex";
+}
+
+function closeCheckout(){
+ document.getElementById("checkoutModal").style.display="none";
+}
+
+function openAccount(){
+ document.getElementById("accountModal").style.display="flex";
+ checkSession();
+}
+
+function closeAccount(){
+ document.getElementById("accountModal").style.display="none";
+}
+
+async function register(){
+ const fullName=document.getElementById("fullName").value.trim();
+ const email=document.getElementById("email").value.trim();
+ const phone=document.getElementById("phone").value.trim();
+ const password=document.getElementById("password").value;
+ const msg=document.getElementById("accountMessage");
+
+ if(!fullName||!email||password.length<6){
+  msg.textContent="Enter your name, email and a password of at least 6 characters.";
+  return;
+ }
+
+ msg.textContent="Creating your account...";
+
+ const {data,error}=await db.auth.signUp({
+  email,
+  password,
+  options:{data:{full_name:fullName,phone}}
+ });
+
+ if(error){
+  msg.textContent=error.message;
+  return;
+ }
+
+ if(data.session){
+  msg.textContent="Account created and logged in. You can now checkout.";
+  await checkSession();
+ }else{
+  msg.textContent="Account created. Check your email for a verification link, then log in.";
+ }
+}
+
+async function login(){
+ const email=document.getElementById("email").value.trim();
+ const password=document.getElementById("password").value;
+ const msg=document.getElementById("accountMessage");
+
+ if(!email||!password){
+  msg.textContent="Enter your email and password.";
+  return;
+ }
+
+ msg.textContent="Logging in...";
+
+ const {error}=await db.auth.signInWithPassword({email,password});
+
+ if(error){
+  msg.textContent=error.message;
+  return;
+ }
+
+ msg.textContent="Welcome back! You can now checkout.";
+ await checkSession();
+}
+
+async function logout(){
+ const {error}=await db.auth.signOut();
+ document.getElementById("accountMessage").textContent=
+  error?error.message:"You have logged out.";
+ await checkSession();
+}
+
+async function checkSession(){
+ const {data}=await db.auth.getSession();
+ const session=data.session;
+
+ document.getElementById("accountForm").style.display=
+  session?"none":"block";
+
+ document.getElementById("loggedIn").style.display=
+  session?"block":"none";
+
+ if(session){
+  document.getElementById("welcome").textContent=
+   "Welcome, "+(session.user.user_metadata.full_name||session.user.email);
+ }
+}
+  async function submitCheckout(){
+ const recipient=document.getElementById("deliveryName").value.trim();
+ const phone=document.getElementById("deliveryPhone").value.trim();
+ const region=document.getElementById("deliveryRegion").value.trim();
+ const city=document.getElementById("deliveryCity").value.trim();
+ const address=document.getElementById("deliveryAddress").value.trim();
+ const payment=document.getElementById("paymentMethod").value;
+ const msg=document.getElementById("checkoutMessage");
+ const btn=document.getElementById("placeOrderButton");
+
+ if(!recipient||!phone||!region||!city||!address){
+  msg.textContent="Please complete all delivery details.";
+  return;
+ }
+
+ if(!cart.length){
+  msg.textContent="Your cart is empty.";
+  return;
+ }
+
+ btn.disabled=true;
+ msg.textContent="Saving your order...";
+
+ try{
+  const {data:sessionData,error:sessionError}=await db.auth.getSession();
+  if(errorSession)throw errorSession;
+
+  if(!sessionData.session){
+   throw new Error("Your session has expired. Please log in again.");
+  }
+
+  const items=cart.map(p=>({
+   product_id:p.id,
+   quantity:Number(p.quantity)
+  }));
+
+  const {data:orderId,error}=await db.rpc("place_shop_order",{
+   p_recipient_name:recipient,
+   p_phone:phone,
+   p_region:region,
+   p_city:city,
+   p_address_details:address,
+   p_payment_method:payment,
+   p_items:items
+  });
+
+  if(error)throw error;
+
+  const orderTotal=cart.reduce((n,p)=>
+   n+Number(p.selling_price)*p.quantity,0);
+
+  const orderMessage=
+   "Hello Quojo Phages Online Shop. I have placed order "+orderId+
+   ".\nPayment method: "+payment+
+   ".\nTotal: GH₵ "+orderTotal.toFixed(2)+
+   ". Please send me the payment instructions.";
+
+  cart=[];
+  saveCart();
+  await loadProducts();
+
+  msg.textContent="Order saved successfully. Order number: "+orderId+
+   ". Payment is pending. We will contact you with payment instructions.";
+
+  btn.disabled=true;
+
+  window.open(
+   "https://wa.me/233556719652?text="+encodeURIComponent(orderMessage),
+   "_blank"
+  );
+
+ }catch(error){
+  console.error(error);
+  msg.textContent=error.message||"We could not save your order. Please try again.";
+  btn.disabled=false;
+ }
+}
+
+db.auth.onAuthStateChange(()=>checkSession());
+
+saveCart();
+loadProducts();
+
+</script>
+</body>
+</html>
