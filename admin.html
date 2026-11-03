@@ -391,7 +391,210 @@ db.auth.getSession().then(async ({data}) => {
     await checkAdmin();
   }
 });
-</script>
+// ORDER MANAGEMENT
+const originalLoadAll = loadAll;
 
+loadAll = async function () {
+  await originalLoadAll();
+  await loadOrders();
+};
+
+function addOrdersSection() {
+  if (document.getElementById("ordersSection")) return;
+
+  const section = document.createElement("section");
+  section.id = "ordersSection";
+
+  const heading = document.createElement("h3");
+  heading.textContent = "Manage Customer Orders";
+
+  const refresh = document.createElement("button");
+  refresh.className = "secondary";
+  refresh.textContent = "Refresh Orders";
+  refresh.onclick = loadOrders;
+
+  const list = document.createElement("div");
+  list.id = "ordersList";
+  list.textContent = "Loading orders...";
+
+  section.append(heading, refresh, list);
+  document.getElementById("dashboard").appendChild(section);
+}
+
+async function loadOrders() {
+  addOrdersSection();
+
+  const list = document.getElementById("ordersList");
+  list.textContent = "Loading orders...";
+
+  const { data: orders, error } = await db
+    .from("orders")
+    .select("id, customer_id, address_id, total_amount, status, payment_status, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    list.textContent = "Could not load orders: " + error.message;
+    return;
+  }
+
+  list.innerHTML = "";
+
+  if (!orders || orders.length === 0) {
+    list.textContent = "No orders found.";
+    return;
+  }
+
+  const addressIds = [...new Set(orders.map(o => o.address_id).filter(Boolean))];
+  const orderIds = orders.map(o => o.id);
+
+  const [addressResult, paymentResult] = await Promise.all([
+    addressIds.length
+      ? db.from("addresses")
+          .select("id, recipient_name, phone, region, city, address_details")
+          .in("id", addressIds)
+      : Promise.resolve({ data: [], error: null }),
+
+    db.from("payments")
+      .select("id, order_id, payment_method, transaction_reference, amount, status")
+      .in("order_id", orderIds)
+  ]);
+
+  if (addressResult.error || paymentResult.error) {
+    list.textContent = "Could not load delivery or payment details: " +
+      (addressResult.error || paymentResult.error).message;
+    return;
+  }
+
+  const addresses = addressResult.data || [];
+  const payments = paymentResult.data || [];
+
+  orders.forEach(order => {
+    const address = addresses.find(a => a.id === order.address_id);
+    const payment = payments.find(p => p.order_id === order.id);
+
+    const card = document.createElement("div");
+    card.className = "item";
+
+    function addText(text) {
+      const p = document.createElement("p");
+      p.textContent = text;
+      card.appendChild(p);
+    }
+
+    addText("Order: " + order.id);
+    addText("Date: " + new Date(order.created_at).toLocaleString());
+    addText("Total: GH₵" + Number(order.total_amount).toFixed(2));
+
+    addText("Customer: " + (address?.recipient_name || "Not available"));
+    addText("Phone: " + (address?.phone || "Not available"));
+    addText("Region: " + (address?.region || ""));
+    addText("City: " + (address?.city || ""));
+    addText("Address: " + (address?.address_details || ""));
+
+    addText("Payment method: " + (payment?.payment_method || "Not available"));
+    addText("Payment amount: GH₵" +
+      Number(payment?.amount ?? order.total_amount).toFixed(2));
+
+    addText("Current payment status: " +
+      (payment?.status || order.payment_status));
+
+    addText("Current order status: " + order.status);
+
+    const referenceLabel = document.createElement("label");
+    referenceLabel.textContent = "Transaction reference";
+    card.appendChild(referenceLabel);
+
+    const reference = document.createElement("input");
+    reference.placeholder = "Enter reference after verifying payment";
+    reference.value = payment?.transaction_reference || "";
+    card.appendChild(reference);
+
+    const paymentLabel = document.createElement("label");
+    paymentLabel.textContent = "Payment status";
+    card.appendChild(paymentLabel);
+
+    const paymentStatus = document.createElement("select");
+
+    ["pending", "paid", "failed"].forEach(value => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value.toUpperCase();
+      paymentStatus.appendChild(option);
+    });
+
+    paymentStatus.value = payment?.status || order.payment_status || "pending";
+    card.appendChild(paymentStatus);
+
+    const orderLabel = document.createElement("label");
+    orderLabel.textContent = "Order status";
+    card.appendChild(orderLabel);
+
+    const orderStatus = document.createElement("select");
+
+    ["pending", "processing", "completed", "cancelled"].forEach(value => {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = value.toUpperCase();
+      orderStatus.appendChild(option);
+    });
+
+    orderStatus.value = order.status || "pending";
+    card.appendChild(orderStatus);
+
+    const save = document.createElement("button");
+    save.textContent = "Save Order Updates";
+
+    save.onclick = async () => {
+      if (!payment) {
+        alert("Payment record not found. No changes were saved.");
+        return;
+      }
+
+      if (paymentStatus.value === "paid" &&
+          !confirm("Have you verified that the customer actually paid?")) {
+        return;
+      }
+
+      save.disabled = true;
+      save.textContent = "Saving...";
+
+      const { error: paymentError } = await db
+        .from("payments")
+        .update({
+          status: paymentStatus.value,
+          transaction_reference: reference.value.trim()
+        })
+        .eq("id", payment.id);
+
+      if (paymentError) {
+        alert("Payment update failed: " + paymentError.message);
+        save.disabled = false;
+        save.textContent = "Save Order Updates";
+        return;
+      }
+
+      const { error: orderError } = await db
+        .from("orders")
+        .update({
+          payment_status: paymentStatus.value,
+          status: orderStatus.value
+        })
+        .eq("id", order.id);
+
+      if (orderError) {
+        alert("Order update failed: " + orderError.message);
+        save.disabled = false;
+        save.textContent = "Save Order Updates";
+        return;
+      }
+
+      alert("Order updated successfully.");
+      await loadOrders();
+    };
+
+    card.appendChild(save);
+    list.appendChild(card);
+  });
+}</script>
 </body>
 </html>
