@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -39,6 +40,7 @@ footer a{color:#ffad64}
 </style>
 </head>
 <body>
+
 <header>
 <div class="top">
 <div class="logo">QUOJO <span>PHAGES</span></div>
@@ -123,7 +125,7 @@ footer a{color:#ffad64}
 </footer>
 
 <script>
- const db = supabase.createClient(
+const db = supabase.createClient(
  "https://ccyltqbmepftkclzkeui.supabase.co",
  "sb_publishable__B512z3E_pMCr2OA6nCr9A_kcpbHbBp"
 );
@@ -309,12 +311,73 @@ async function checkSession(){
    "Welcome, "+(session.user.user_metadata.full_name || session.user.email);
  }
 }
- .getSession();
-  if(sessionError) throw sessionError;
 
-  if(!sessionData.session){
-   throw new Error("Please log in again.");
-  }
+/* CART AND CHECKOUT FUNCTIONS */
+
+async function showCart(){
+ const {data,error}=await db.auth.getSession();
+
+ if(error){
+  alert(error.message);
+  return;
+ }
+
+ if(!data.session){
+  await openAccount();
+  document.getElementById("accountMessage").textContent=
+   "Please log in before checkout.";
+  return;
+ }
+
+ if(!cart.length){
+  alert("Your cart is empty.");
+  return;
+ }
+
+ const total=cart.reduce(
+  (n,p)=>n+Number(p.selling_price)*p.quantity,0
+ );
+
+ document.getElementById("checkoutTotal").textContent=
+  "Order total: GH₵ "+total.toFixed(2);
+
+ document.getElementById("checkoutMessage").textContent="";
+ document.getElementById("placeOrderButton").disabled=false;
+ document.getElementById("checkoutModal").style.display="flex";
+}
+
+function closeCheckout(){
+ document.getElementById("checkoutModal").style.display="none";
+}
+
+async function submitCheckout(){
+ const recipient=document.getElementById("deliveryName").value.trim();
+ const phone=document.getElementById("deliveryPhone").value.trim();
+ const region=document.getElementById("deliveryRegion").value.trim();
+ const city=document.getElementById("deliveryCity").value.trim();
+ const address=document.getElementById("deliveryAddress").value.trim();
+ const payment=document.getElementById("paymentMethod").value;
+ const msg=document.getElementById("checkoutMessage");
+ const btn=document.getElementById("placeOrderButton");
+
+ if(!recipient || !phone || !region || !city || !address){
+  msg.textContent="Please complete all delivery details.";
+  return;
+ }
+
+ if(!cart.length){
+  msg.textContent="Your cart is empty.";
+  return;
+ }
+
+ btn.disabled=true;
+ msg.textContent="Saving your order...";
+
+ try{
+  const {data:sessionData,error:sessionError}=await db.auth.getSession();
+
+  if(sessionError) throw sessionError;
+  if(!sessionData.session) throw new Error("Please log in again.");
 
   const items=cart.map(p=>({
    product_id:p.id,
@@ -341,8 +404,11 @@ async function checkSession(){
 
   window.location.href=
    "https://wa.me/233556719652?text="+
-   encodeURIComponent("Hello, I have placed order "+orderId+
-   ". Payment method: "+payment+". Please guide me with payment.");
+   encodeURIComponent(
+    "Hello, I have placed order "+orderId+
+    ". Payment method: "+payment+
+    ". Please guide me with payment."
+   );
 
  }catch(error){
   msg.textContent=error.message;
