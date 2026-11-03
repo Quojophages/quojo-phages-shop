@@ -395,7 +395,27 @@ async function submitCheckout(){
   });
 
   if(error) throw error;
+const { data: savedOrder, error: orderFetchError } = await db
+  .from("orders")
+  .select("total_amount")
+  .eq("id", orderId)
+  .single();
 
+if (!orderFetchError && savedOrder) {
+  const { error: emailError } = await db.functions.invoke(
+    "send-order-email",
+    {
+      body: {
+        order_id: orderId,
+        total_amount: savedOrder.total_amount
+      }
+    }
+  );
+
+  if (emailError) {
+    console.error("Email notification failed:", emailError);
+  }
+}
   cart=[];
   saveCart();
   closeCheckout();
