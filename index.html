@@ -42,6 +42,9 @@ main{max-width:1100px;margin:auto;padding:15px}
 .cart-controls .remove{background:#ffe5e5;color:#a00}
 .cart-summary{font-weight:bold;font-size:18px;margin:18px 0}
 .cart-empty{text-align:center;padding:20px 0;color:#666}
+.order-card{border:1px solid #ddd;border-radius:7px;padding:12px;margin:10px 0}
+.order-status{font-weight:bold;color:#f58220;text-transform:capitalize}
+.order-track{background:#f7f7f7;border-radius:5px;padding:9px;margin-top:8px;font-size:13px}
 footer{background:var(--navy);color:white;text-align:center;padding:25px;margin-top:30px}
 footer a{color:#ffad64}
 @media(max-width:700px){.products{grid-template-columns:repeat(2,1fr)}}
@@ -93,6 +96,8 @@ footer a{color:#ffad64}
 </div>
 <div id="loggedIn" style="display:none">
 <p id="welcome"></p>
+<button class="orange" onclick="loadMyOrders()">My Orders / Track Order</button>
+<div id="myOrders" class="notice"></div>
 <button class="orange" onclick="logout()">Log Out</button>
 </div>
 <p id="accountMessage" class="notice"></p>
@@ -257,6 +262,53 @@ async function openAccount(){
 
 function closeAccount(){
  document.getElementById("accountModal").style.display="none";
+}
+
+async function loadMyOrders(){
+ const box=document.getElementById("myOrders");
+ box.innerHTML="<p>Loading your orders...</p>";
+ const {data:sessionData,error:sessionError}=await db.auth.getSession();
+ if(sessionError || !sessionData.session){
+  box.textContent="Please log in to view your orders.";
+  return;
+ }
+ const {data:orders,error}=await db.from("orders")
+  .select("id,total_amount,status,payment_status,created_at")
+  .eq("customer_id",sessionData.session.user.id)
+  .order("created_at",{ascending:false});
+ if(error){
+  box.textContent="Your orders could not be loaded: "+error.message;
+  return;
+ }
+ if(!orders || !orders.length){
+  box.textContent="You have not placed any orders yet.";
+  return;
+ }
+ box.innerHTML="";
+ orders.forEach(order=>{
+  const card=document.createElement("div");
+  card.className="order-card";
+  const heading=document.createElement("strong");
+  heading.textContent="Order #"+order.id;
+  const date=document.createElement("p");
+  date.textContent="Date: "+new Date(order.created_at).toLocaleString();
+  const total=document.createElement("p");
+  total.textContent="Total: GH₵ "+Number(order.total_amount).toFixed(2);
+  const payment=document.createElement("p");
+  payment.textContent="Payment: "+(order.payment_status||"pending");
+  const progress=document.createElement("p");
+  progress.className="order-status";
+  progress.textContent="Order status: "+(order.status||"pending");
+  const note=document.createElement("div");
+  note.className="order-track";
+  const status=(order.status||"pending").toLowerCase();
+  note.textContent=status==="completed"?"Your order has been completed."
+   :status==="cancelled"?"This order has been cancelled. Please contact our support if you need help."
+   :status==="processing"?"Your order is being prepared."
+   :"Your order has been received and is awaiting processing.";
+  card.append(heading,date,total,payment,progress,note);
+  box.appendChild(card);
+ });
 }
 
 async function register(){
