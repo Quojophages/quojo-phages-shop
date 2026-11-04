@@ -576,7 +576,6 @@ async function loadOrders() {
       const { error: orderError } = await db
         .from("orders")
         .update({
-          payment_status: paymentStatus.value,
           status: orderStatus.value
         })
         .eq("id", order.id);
