@@ -531,7 +531,7 @@ async function loadOrders() {
 
     const orderStatus = document.createElement("select");
 
-    ["pending", "processing", "completed", "cancelled"].forEach(value => {
+    ["pending", "confirmed", "processing"].forEach(value => {
       const option = document.createElement("option");
       option.value = value;
       option.textContent = value.toUpperCase();
