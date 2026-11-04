@@ -305,6 +305,7 @@ async function loadMyOrders(){
   note.textContent=status==="completed"?"Your order has been completed."
    :status==="cancelled"?"This order has been cancelled. Please contact our support if you need help."
    :status==="processing"?"Your order is being prepared."
+   :status==="confirmed"?"Your order has been confirmed."
    :"Your order has been received and is awaiting processing.";
   card.append(heading,date,total,payment,progress,note);
   box.appendChild(card);
