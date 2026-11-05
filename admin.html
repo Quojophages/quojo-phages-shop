@@ -361,12 +361,39 @@ async function loadProducts() {
     edit.textContent = "Edit Product";
     edit.onclick = () => editProduct(product);
 
+    const imageButton = document.createElement("button");
+    imageButton.className = "secondary";
+    imageButton.textContent = product.image_url ? "Change Picture" : "Add Picture";
+    imageButton.onclick = () => {
+      const picker = document.createElement("input");
+      picker.type = "file";
+      picker.accept = "image/jpeg,image/png,image/webp";
+      picker.onchange = async () => {
+        const file = picker.files && picker.files[0];
+        if (!file) return;
+        imageButton.disabled = true;
+        imageButton.textContent = "Uploading picture...";
+        try {
+          const imageUrl = await uploadProductImage(file);
+          const { error: updateError } = await db.from("products")
+            .update({ image_url: imageUrl }).eq("id", product.id);
+          if (updateError) throw updateError;
+          await loadProducts();
+        } catch (error) {
+          alert("Picture update failed: " + error.message);
+          imageButton.disabled = false;
+          imageButton.textContent = product.image_url ? "Change Picture" : "Add Picture";
+        }
+      };
+      picker.click();
+    };
+
     const toggle = document.createElement("button");
     toggle.className = product.is_active ? "danger" : "secondary";
     toggle.textContent = product.is_active ? "Deactivate Product" : "Activate Product";
     toggle.onclick = () => toggleProduct(product);
 
-    item.append(title, details, edit, toggle);
+    item.append(title, details, edit, imageButton, toggle);
     list.appendChild(item);
   });
 
