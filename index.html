@@ -134,6 +134,7 @@ footer a{color:#ffad64}
 <select class="field" id="paymentMethod">
 <option value="MTN MoMo">MTN Mobile Money</option>
 <option value="Telecel Cash">Telecel Cash</option>
+<option value="Paystack">Paystack (Card & Mobile Money)</option>
 </select>
 <p id="checkoutMessage" class="notice"></p>
 <button class="orange" id="placeOrderButton" onclick="submitCheckout()">Place Order</button>
@@ -554,6 +555,20 @@ if (!orderFetchError && savedOrder) {
     console.error("Email notification failed:", emailError);
   }
 }
+  if(payment==="Paystack"){
+   msg.textContent="Starting secure Paystack payment...";
+   const {data:paymentData,error:paymentError}=await db.functions.invoke(
+    "paystack-payment",
+    {body:{action:"initialize",order_id:orderId}}
+   );
+   if(paymentError) throw paymentError;
+   if(!paymentData || !paymentData.authorization_url){
+    throw new Error(paymentData?.error || "Paystack could not start this payment.");
+   }
+   window.location.href=paymentData.authorization_url;
+   return;
+  }
+
   cart=[];
   saveCart();
   closeCheckout();
