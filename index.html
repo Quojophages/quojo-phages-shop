@@ -43,7 +43,7 @@ main{max-width:1100px;margin:auto;padding:15px}
 .cart-summary{font-weight:bold;font-size:18px;margin:18px 0}
 .cart-empty{text-align:center;padding:20px 0;color:#666}
 .order-card{border:1px solid #ddd;border-radius:7px;padding:12px;margin:10px 0}
-.detail-image{width:100%;max-height:260px;object-fit:contain;background:#f7f7f7;border-radius:7px}.variant-label{display:block;font-weight:bold;margin:12px 0 4px}.variant-select{width:100%;padding:12px;border:1px solid #ccc;border-radius:5px;margin-bottom:12px}.review-card{border-bottom:1px solid #eee;padding:10px 0}.stars{color:#f58220;font-size:18px}
+.detail-image{width:100%;max-height:300px;object-fit:contain;background:#f7f7f7;border-radius:7px}.gallery-thumbs{display:flex;gap:8px;overflow-x:auto;margin:8px 0 14px}.gallery-thumbs img{width:64px;height:64px;object-fit:cover;border:2px solid #ddd;border-radius:6px;cursor:pointer}.gallery-thumbs img.active{border-color:var(--orange)}.detail-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.buy-now{background:var(--navy);color:white}.spec-list{background:#f7f7f7;padding:12px;border-radius:7px;white-space:pre-line}.quantity-select{display:flex;align-items:center;gap:12px;margin:12px 0}.quantity-select button{background:#eee;padding:8px 14px}.quantity-select strong{min-width:24px;text-align:center}.related-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.related-card{border:1px solid #eee;border-radius:7px;padding:8px;cursor:pointer}.related-card img{width:100%;height:90px;object-fit:contain}.variant-label{display:block;font-weight:bold;margin:12px 0 4px}.variant-select{width:100%;padding:12px;border:1px solid #ccc;border-radius:5px;margin-bottom:12px}.review-card{border-bottom:1px solid #eee;padding:10px 0}.stars{color:#f58220;font-size:18px}
 .order-status{font-weight:bold;color:#f58220;text-transform:capitalize}
 .order-track{background:#f7f7f7;border-radius:5px;padding:9px;margin-top:8px;font-size:13px}
 footer{background:var(--navy);color:white;text-align:center;padding:25px;margin-top:30px}
@@ -215,7 +215,7 @@ function saveCart(){
 async function loadProducts(){
  const box = document.getElementById("products");
  const {data,error} = await db.from("products")
-  .select("id,name,description,selling_price,stock_quantity,image_url,category_id,variants")
+  .select("id,name,description,selling_price,stock_quantity,image_url,category_id,variants,additional_images,specifications")
   .eq("is_active",true)
   .order("created_at",{ascending:false});
 
@@ -289,25 +289,51 @@ function renderProducts(){
 async function openProductDetails(id){
  const p=allProducts.find(x=>x.id===id); if(!p)return;
  const box=document.getElementById('productDetails'); box.innerHTML='';
- const image=document.createElement('img'); image.className='detail-image'; image.src=getProductImage(p); image.alt=p.name;
- const name=document.createElement('h2'); name.textContent=p.name;
- const price=document.createElement('p'); price.className='price'; price.textContent='GH₵ '+Number(p.selling_price).toFixed(2);
- const desc=document.createElement('p'); desc.textContent=p.description||'No description has been added yet.';
- const stock=document.createElement('p'); stock.textContent='Available stock: '+Number(p.stock_quantity);
- const optionLabel=document.createElement('label'); optionLabel.className='variant-label'; optionLabel.textContent='Choose size, colour or type';
- const optionSelect=document.createElement('select'); optionSelect.className='variant-select'; optionSelect.id='selectedProductVariant';
- const optionList=(p.variants||'').split(',').map(x=>x.trim()).filter(Boolean);
- if(optionList.length){const prompt=document.createElement('option');prompt.value='';prompt.textContent='Select an option';optionSelect.appendChild(prompt);optionList.forEach(function(value){const opt=document.createElement('option');opt.value=value;opt.textContent=value;optionSelect.appendChild(opt);});}
- else {const opt=document.createElement('option');opt.value='';opt.textContent='No option required';optionSelect.appendChild(opt);optionSelect.disabled=true;}
- const add=document.createElement('button'); add.className='orange'; add.textContent='Add to Cart'; add.disabled=Number(p.stock_quantity)<=0; add.onclick=function(){const chosen=optionSelect.value;if(optionList.length&&!chosen){alert('Please select an option first.');return;}addToCart(p.id,chosen);closeProductDetails();};
- const heading=document.createElement('h3'); heading.textContent='Customer Reviews';
- const reviews=document.createElement('div'); reviews.id='productReviews'; reviews.textContent='Loading reviews...';
- const rating=document.createElement('select'); rating.className='field'; rating.id='reviewRating';
+ const gallery=[p.image_url,...(Array.isArray(p.additional_images)?p.additional_images:[])].filter(Boolean);
+ const image=document.createElement('img'); image.className='detail-image'; image.src=gallery[0]||getProductImage(p); image.alt=p.name;
+ const thumbs=document.createElement('div'); thumbs.className='gallery-thumbs';
+ gallery.forEach(function(url,index){const t=document.createElement('img');t.src=url;t.alt=p.name+' image '+(index+1);if(index===0)t.classList.add('active');t.onclick=function(){image.src=url;thumbs.querySelectorAll('img').forEach(x=>x.classList.remove('active'));t.classList.add('active');};thumbs.appendChild(t);});
+ const name=document.createElement('h2');name.textContent=p.name;
+ const price=document.createElement('p');price.className='price';price.textContent='GH₵ '+Number(p.selling_price).toFixed(2);
+ const desc=document.createElement('p');desc.textContent=p.description||'No description has been added yet.';
+ const stock=document.createElement('p');stock.textContent='Available stock: '+Number(p.stock_quantity);
+ const specsHeading=document.createElement('h3');specsHeading.textContent='Product specifications';
+ const specs=document.createElement('div');specs.className='spec-list';specs.textContent=p.specifications||'Specifications have not been added yet.';
+ const options=(p.variants||'').split(',').map(x=>x.trim()).filter(Boolean);
+ const optionLabel=document.createElement('label');optionLabel.className='variant-label';optionLabel.textContent='Choose size, colour or type';
+ const select=document.createElement('select');select.className='variant-select';
+ if(options.length){const first=document.createElement('option');first.value='';first.textContent='Select an option';select.appendChild(first);options.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=v;select.appendChild(o);});}
+ else{const o=document.createElement('option');o.value='';o.textContent='No option required';select.appendChild(o);select.disabled=true;}
+ const qtyTitle=document.createElement('label');qtyTitle.className='variant-label';qtyTitle.textContent='Quantity';
+ const qtyBox=document.createElement('div');qtyBox.className='quantity-select';
+ const minus=document.createElement('button');minus.type='button';minus.textContent='−';
+ const qtyText=document.createElement('strong');qtyText.textContent='1';
+ const plus=document.createElement('button');plus.type='button';plus.textContent='+';
+ let qty=1;minus.onclick=()=>{qty=Math.max(1,qty-1);qtyText.textContent=qty;};plus.onclick=()=>{if(qty<Number(p.stock_quantity)){qty++;qtyText.textContent=qty;}};
+ qtyBox.append(minus,qtyText,plus);
+ const deliveryTitle=document.createElement('h3');deliveryTitle.textContent='Delivery information';
+ const delivery=document.createElement('p');delivery.textContent='Delivery options and fees are confirmed during checkout based on your delivery location.';
+ const actions=document.createElement('div');actions.className='detail-actions';
+ const add=document.createElement('button');add.className='orange';add.textContent='Add to Cart';
+ const buy=document.createElement('button');buy.className='buy-now';buy.textContent='Buy Now';
+ add.disabled=buy.disabled=Number(p.stock_quantity)<=0;
+ function addSelected(goCheckout){if(options.length&&!select.value){alert('Please select an option first.');return;}addToCart(p.id,select.value,qty);closeProductDetails();if(goCheckout){showCart();proceedToCheckout();}}
+ add.onclick=()=>addSelected(false);buy.onclick=()=>addSelected(true);actions.append(add,buy);
+ const reviewTitle=document.createElement('h3');reviewTitle.textContent='Customer Reviews';
+ const reviews=document.createElement('div');reviews.id='productReviews';reviews.textContent='Loading reviews...';
+ const rating=document.createElement('select');rating.className='field';rating.id='reviewRating';
  for(let n=5;n>=1;n--){const o=document.createElement('option');o.value=String(n);o.textContent=n+' stars';rating.appendChild(o);}
- const review=document.createElement('textarea'); review.className='field'; review.id='reviewText'; review.placeholder='Write your review'; review.rows=3;
- const submit=document.createElement('button'); submit.className='orange'; submit.textContent='Submit Review'; submit.onclick=function(){submitProductReview(id);};
- if(optionList.length) box.append(image,name,price,desc,stock,optionLabel,optionSelect,add,heading,reviews,rating,review,submit); else box.append(image,name,price,desc,stock,add,heading,reviews,rating,review,submit);
- document.getElementById('productModal').style.display='flex'; await loadProductReviews(id);
+ const review=document.createElement('textarea');review.className='field';review.id='reviewText';review.placeholder='Write your review';review.rows=3;
+ const submit=document.createElement('button');submit.className='orange';submit.textContent='Submit Review';submit.onclick=()=>submitProductReview(id);
+ const relatedTitle=document.createElement('h3');relatedTitle.textContent='Similar products';
+ const related=document.createElement('div');related.className='related-grid';
+ allProducts.filter(x=>x.id!==p.id&&x.category_id===p.category_id).slice(0,4).forEach(x=>{const card=document.createElement('div');card.className='related-card';const pic=document.createElement('img');pic.src=getProductImage(x);const title=document.createElement('strong');title.textContent=x.name;const cost=document.createElement('p');cost.className='price';cost.textContent='GH₵ '+Number(x.selling_price).toFixed(2);card.append(pic,title,cost);card.onclick=()=>openProductDetails(x.id);related.appendChild(card);});
+ box.append(image);if(gallery.length>1)box.append(thumbs);box.append(name,price,desc,stock);
+ if(p.specifications)box.append(specsHeading,specs);
+ if(options.length)box.append(optionLabel,select);
+ box.append(qtyTitle,qtyBox,deliveryTitle,delivery,actions,reviewTitle,reviews,rating,review,submit);
+ if(related.childElementCount)box.append(relatedTitle,related);
+ document.getElementById('productModal').style.display='flex';await loadProductReviews(id);
 }
 function closeProductDetails(){document.getElementById('productModal').style.display='none';}
 async function loadProductReviews(id){
@@ -330,7 +356,7 @@ async function submitProductReview(id){
  document.getElementById('reviewText').value=''; await loadProductReviews(id);
 }
 
-function addToCart(id,selectedVariant=''){
+function addToCart(id,selectedVariant='',quantity=1){
  const p = allProducts.find(x=>x.id===id);
  if(!p) return;
 
@@ -340,10 +366,10 @@ function addToCart(id,selectedVariant=''){
    alert("No more stock available.");
    return;
   }
-  item.quantity++;
+  item.quantity=Math.min(Number(p.stock_quantity),item.quantity+Number(quantity));
   item.selected_variant=selectedVariant;
  }else{
-  cart.push({...p,selected_variant:selectedVariant,quantity:1});
+  cart.push({...p,selected_variant:selectedVariant,quantity:Number(quantity)});
  }
  saveCart();
  alert("Product added to your cart.");
