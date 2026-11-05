@@ -60,6 +60,9 @@ button{background:#f58220;color:white;border:0;font-weight:bold;cursor:pointer}
 <option value="">Loading categories...</option>
 </select>
 
+<label>Product types / options (e.g. Small, Medium, Large; Black, White)</label>
+<input id="productVariants" placeholder="Enter available types, sizes or colours separated by commas">
+
 <label>Store</label>
 <select id="storeSelect">
 <option value="">Loading stores...</option>
@@ -302,6 +305,7 @@ async function addProduct() {
     category_id: categoryId,
     name: name,
     description: description,
+    variants: document.getElementById("productVariants").value.trim(),
     image_url: imageUrl || null,
     selling_price: price,
     stock_quantity: stock,
@@ -315,7 +319,7 @@ async function addProduct() {
 
   message("productMessage", "Product added successfully!");
 
-  ["productName","productDescription","imageUrl",
+  ["productName","productDescription","productVariants","imageUrl",
    "sellingPrice","stockQuantity","productImageFile"].forEach(id => {
     document.getElementById(id).value = "";
   });
@@ -411,6 +415,8 @@ async function editProduct(product) {
 
   const stockText = prompt("Stock quantity:", product.stock_quantity);
   if (stockText === null) return;
+  const variants = prompt("Available types, sizes or colours (separate with commas):", product.variants || "");
+  if (variants === null) return;
 
   const price = Number(priceText);
   const stock = Number(stockText);
@@ -425,7 +431,8 @@ async function editProduct(product) {
   const {error} = await db.from("products").update({
     name: name.trim(),
     selling_price: price,
-    stock_quantity: stock
+    stock_quantity: stock,
+    variants: variants.trim()
   }).eq("id", product.id);
 
   if (error) {
