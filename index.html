@@ -97,6 +97,7 @@ footer a{color:#ffad64}
 <div id="loggedIn" style="display:none">
 <p id="welcome"></p>
 <button class="orange" onclick="loadMyOrders()">My Orders / Track Order</button>
+<button class="orange" id="adminDashboardLink" style="display:none" onclick="window.location.href='./admin.html'">Admin Dashboard</button>
 <div id="myOrders" class="notice"></div>
 <button class="orange" onclick="logout()">Log Out</button>
 </div>
@@ -380,9 +381,13 @@ async function checkSession(){
  document.getElementById("loggedIn").style.display=
   session ? "block" : "none";
 
+ const adminLink=document.getElementById("adminDashboardLink");
+ if(adminLink) adminLink.style.display="none";
  if(session){
   document.getElementById("welcome").textContent=
    "Welcome, "+(session.user.user_metadata.full_name || session.user.email);
+  const {data:profile}=await db.from("profiles").select("role").eq("id",session.user.id).maybeSingle();
+  if(adminLink && profile && profile.role==="admin") adminLink.style.display="block";
  }
 }
 
