@@ -43,6 +43,7 @@ main{max-width:1100px;margin:auto;padding:15px}
 .cart-summary{font-weight:bold;font-size:18px;margin:18px 0}
 .cart-empty{text-align:center;padding:20px 0;color:#666}
 .order-card{border:1px solid #ddd;border-radius:7px;padding:12px;margin:10px 0}
+.detail-image{width:100%;max-height:260px;object-fit:contain;background:#f7f7f7;border-radius:7px}.review-card{border-bottom:1px solid #eee;padding:10px 0}.stars{color:#f58220;font-size:18px}
 .order-status{font-weight:bold;color:#f58220;text-transform:capitalize}
 .order-track{background:#f7f7f7;border-radius:5px;padding:9px;margin-top:8px;font-size:13px}
 footer{background:var(--navy);color:white;text-align:center;padding:25px;margin-top:30px}
@@ -108,6 +109,7 @@ footer a{color:#ffad64}
 </div>
 
 
+<div class="modal" id="productModal"><div class="modal-box"><button class="close" onclick="closeProductDetails()">Close</button><div id="productDetails"></div></div></div>
 <div class="modal" id="cartModal">
 <div class="modal-box">
 <h2>Your Shopping Cart</h2>
@@ -213,7 +215,7 @@ function saveCart(){
 async function loadProducts(){
  const box = document.getElementById("products");
  const {data,error} = await db.from("products")
-  .select("id,name,description,selling_price,stock_quantity,image_url,category_id")
+  .select("id,name,description,selling_price,stock_quantity,image_url,category_id,variants")
   .eq("is_active",true)
   .order("created_at",{ascending:false});
 
@@ -274,7 +276,7 @@ function renderProducts(){
   <article class="product">
    <img src="${getProductImage(p)}" alt="${p.name}" onerror="this.onerror=null;this.src=\'https://placehold.co/300x200?text=Quojo\'">
    <div class="info">
-    <h3>${p.name}</h3>
+    <h3 onclick="openProductDetails(&quot;${p.id}&quot;)" style="cursor:pointer">${p.name}</h3>
     <p class="price">GH₵ ${Number(p.selling_price).toFixed(2)}</p>
     <p>Stock: ${Number(p.stock_quantity)}</p>
     <button class="add" ${Number(p.stock_quantity)<=0?"disabled":""}
@@ -282,6 +284,46 @@ function renderProducts(){
    </div>
   </article>
  `).join("");
+}
+
+async function openProductDetails(id){
+ const p=allProducts.find(x=>x.id===id); if(!p)return;
+ const box=document.getElementById('productDetails'); box.innerHTML='';
+ const image=document.createElement('img'); image.className='detail-image'; image.src=getProductImage(p); image.alt=p.name;
+ const name=document.createElement('h2'); name.textContent=p.name;
+ const price=document.createElement('p'); price.className='price'; price.textContent='GH₵ '+Number(p.selling_price).toFixed(2);
+ const desc=document.createElement('p'); desc.textContent=p.description||'No description has been added yet.';
+ const stock=document.createElement('p'); stock.textContent='Available stock: '+Number(p.stock_quantity);
+ const options=document.createElement('p'); options.textContent='Available types, sizes or colours: '+(p.variants||'Please contact the shop to confirm available options.');
+ const add=document.createElement('button'); add.className='orange'; add.textContent='Add to Cart'; add.disabled=Number(p.stock_quantity)<=0; add.onclick=function(){addToCart(p.id);closeProductDetails();};
+ const heading=document.createElement('h3'); heading.textContent='Customer Reviews';
+ const reviews=document.createElement('div'); reviews.id='productReviews'; reviews.textContent='Loading reviews...';
+ const rating=document.createElement('select'); rating.className='field'; rating.id='reviewRating';
+ for(let n=5;n>=1;n--){const o=document.createElement('option');o.value=String(n);o.textContent=n+' stars';rating.appendChild(o);}
+ const review=document.createElement('textarea'); review.className='field'; review.id='reviewText'; review.placeholder='Write your review'; review.rows=3;
+ const submit=document.createElement('button'); submit.className='orange'; submit.textContent='Submit Review'; submit.onclick=function(){submitProductReview(id);};
+ box.append(image,name,price,desc,stock,options,add,heading,reviews,rating,review,submit);
+ document.getElementById('productModal').style.display='flex'; await loadProductReviews(id);
+}
+function closeProductDetails(){document.getElementById('productModal').style.display='none';}
+async function loadProductReviews(id){
+ const box=document.getElementById('productReviews');
+ const result=await db.from('product_reviews').select('rating,review_text,created_at').eq('product_id',id).order('created_at',{ascending:false});
+ if(result.error){box.textContent='Reviews could not be loaded.';return;}
+ if(!result.data||!result.data.length){box.textContent='No customer reviews yet. Be the first to review this product.';return;}
+ box.innerHTML='';
+ result.data.forEach(function(r){const card=document.createElement('div');card.className='review-card';const stars=document.createElement('div');stars.className='stars';stars.textContent='★'.repeat(r.rating)+'☆'.repeat(5-r.rating);const body=document.createElement('p');body.textContent=r.review_text;const date=document.createElement('small');date.textContent=new Date(r.created_at).toLocaleDateString();card.append(stars,body,date);box.appendChild(card);});
+}
+async function submitProductReview(id){
+ const box=document.getElementById('productReviews');
+ const sessionResult=await db.auth.getSession();
+ if(sessionResult.error||!sessionResult.data.session){box.textContent='Please log in to submit a review.';return;}
+ const reviewText=document.getElementById('reviewText').value.trim();
+ const rating=Number(document.getElementById('reviewRating').value);
+ if(!reviewText){alert('Please write your review.');return;}
+ const result=await db.from('product_reviews').insert({product_id:id,user_id:sessionResult.data.session.user.id,rating:rating,review_text:reviewText});
+ if(result.error){box.textContent=result.error.code==='23505'?'You have already reviewed this product.':result.error.message;return;}
+ document.getElementById('reviewText').value=''; await loadProductReviews(id);
 }
 
 function addToCart(id){
