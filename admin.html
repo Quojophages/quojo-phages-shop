@@ -73,6 +73,17 @@ button{background:#f58220;color:white;border:0;font-weight:bold;cursor:pointer}
 <p id="productMessage" class="message"></p>
 </section>
 
+<section id="bulkImportSection">
+<h3>Bulk Product Import</h3>
+<p>Upload a CSV file to add many products at once. Use the template so the column names are correct.</p>
+<button type="button" class="secondary" onclick="downloadProductTemplate()">Download CSV Template</button>
+<label for="bulkProductFile">Choose CSV file</label>
+<input id="bulkProductFile" type="file" accept=".csv,text/csv">
+<p class="small">Required columns: product_name, category_name, store_name, selling_price, stock_quantity. Optional: description, image_url. Category and store names must already exist. Use a public image URL in image_url.</p>
+<button type="button" onclick="importProductsCSV()">Import Products</button>
+<p id="bulkImportMessage" class="message" aria-live="polite"></p>
+</section>
+
 <section>
 <h3>Manage Products</h3>
 <div id="productsList">Loading products...</div>
@@ -392,6 +403,180 @@ db.auth.getSession().then(async ({data}) => {
     await checkAdmin();
   }
 });
+// BULK PRODUCT CSV IMPORT
+function downloadProductTemplate() {
+  const csv = [
+    "product_name,description,category_name,store_name,image_url,selling_price,stock_quantity",
+    '"Wireless Headphones","Bluetooth headphones","Electronics","Quojo Main Store","https://example.com/headphones.jpg",250,20',
+    '"Running Sneakers","Comfortable running shoes","Shoes","Quojo Main Store","",180,15'
+  ].join("\r\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "quojo-products-template.csv";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [], cell = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"' && quoted && text[i + 1] === '"') {
+      cell += '"'; i++;
+    } else if (ch === '"') {
+      quoted = !quoted;
+    } else if (ch === "," && !quoted) {
+      row.push(cell); cell = "";
+    } else if ((ch === "\n" || ch === "\r") && !quoted) {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell); cell = "";
+      if (row.some(value => value.trim() !== "")) rows.push(row);
+      row = [];
+    } else {
+      cell += ch;
+    }
+  }
+  row.push(cell);
+  if (row.some(value => value.trim() !== "")) rows.push(row);
+  return rows;
+}
+
+async function importProductsCSV() {
+  const fileInput = document.getElementById("bulkProductFile");
+  const output = document.getElementById("bulkImportMessage");
+  const file = fileInput.files && fileInput.files[0];
+
+  if (!file) {
+    output.textContent = "Please choose a CSV file first.";
+    return;
+  }
+  if (!file.name.toLowerCase().endsWith(".csv")) {
+    output.textContent = "Please upload a .csv file.";
+    return;
+  }
+
+  output.textContent = "Reading CSV file...";
+  let rows;
+  try {
+    rows = parseCSV(await file.text());
+  } catch (error) {
+    output.textContent = "Could not read the CSV file: " + error.message;
+    return;
+  }
+
+  if (rows.length < 2) {
+    output.textContent = "The CSV file has no product rows.";
+    return;
+  }
+
+  const headers = rows[0].map(h => h.trim().toLowerCase().replace(/^\uFEFF/, ""));
+  const required = ["product_name", "category_name", "store_name", "selling_price", "stock_quantity"];
+  const missing = required.filter(h => !headers.includes(h));
+  if (missing.length) {
+    output.textContent = "Missing required CSV columns: " + missing.join(", ");
+    return;
+  }
+
+  output.textContent = "Checking categories and approved stores...";
+  const [categoryResult, storeResult] = await Promise.all([
+    db.from("categories").select("id,name"),
+    db.from("stores").select("id,store_name,status")
+  ]);
+  if (categoryResult.error || storeResult.error) {
+    output.textContent = "Could not load categories or stores: " +
+      (categoryResult.error || storeResult.error).message;
+    return;
+  }
+
+  const categoryMap = new Map((categoryResult.data || []).map(c => [c.name.trim().toLowerCase(), c.id]));
+  const storeMap = new Map((storeResult.data || [])
+    .filter(store => store.status === "approved")
+    .map(store => [store.store_name.trim().toLowerCase(), store.id]));
+
+  const index = name => headers.indexOf(name);
+  const validProducts = [];
+  const problems = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const cells = rows[i];
+    const value = name => {
+      const at = index(name);
+      return at < 0 ? "" : (cells[at] || "").trim();
+    };
+    const line = i + 1;
+    const name = value("product_name");
+    const categoryName = value("category_name");
+    const storeName = value("store_name");
+    const priceText = value("selling_price");
+    const stockText = value("stock_quantity");
+    const price = Number(priceText);
+    const stock = Number(stockText);
+    const categoryId = categoryMap.get(categoryName.toLowerCase());
+    const storeId = storeMap.get(storeName.toLowerCase());
+    const imageUrl = value("image_url");
+
+    if (!name || !categoryId || !storeId || priceText === "" ||
+        stockText === "" || !Number.isFinite(price) || price < 0 ||
+        !Number.isInteger(stock) || stock < 0) {
+      problems.push("Row " + line + ": check product name, category, approved store, price and stock.");
+      continue;
+    }
+    if (imageUrl) {
+      try {
+        const url = new URL(imageUrl);
+        if (!["https:", "http:"].includes(url.protocol)) throw new Error();
+      } catch {
+        problems.push("Row " + line + ": image_url must be a valid http or https URL.");
+        continue;
+      }
+    }
+
+    validProducts.push({
+      store_id: storeId,
+      category_id: categoryId,
+      name,
+      description: value("description"),
+      image_url: imageUrl || null,
+      selling_price: price,
+      stock_quantity: stock,
+      is_active: true
+    });
+  }
+
+  if (!validProducts.length) {
+    output.textContent = "No valid products to import. " + problems.slice(0, 5).join(" ");
+    return;
+  }
+
+  let imported = 0;
+  const failedBatches = [];
+  for (let start = 0; start < validProducts.length; start += 50) {
+    const batch = validProducts.slice(start, start + 50);
+    output.textContent = "Importing products " + (start + 1) + "–" +
+      (start + batch.length) + " of " + validProducts.length + "...";
+    const {error} = await db.from("products").insert(batch);
+    if (error) {
+      failedBatches.push("Batch starting at product " + (start + 1) + ": " + error.message);
+    } else {
+      imported += batch.length;
+    }
+  }
+
+  await loadProducts();
+  const skipped = rows.length - 1 - validProducts.length;
+  output.textContent = "Import finished: " + imported + " product(s) added. " +
+    skipped + " row(s) skipped during validation. " +
+    failedBatches.length + " batch(es) failed." +
+    (problems.length ? " First issue: " + problems[0] : "") +
+    (failedBatches.length ? " First database error: " + failedBatches[0] : "");
+  fileInput.value = "";
+}
+
 // ORDER MANAGEMENT
 const originalLoadAll = loadAll;
 
