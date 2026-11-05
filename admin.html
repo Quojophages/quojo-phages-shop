@@ -62,6 +62,10 @@ button{background:#f58220;color:white;border:0;font-weight:bold;cursor:pointer}
 
 <label>Product types / options (e.g. Small, Medium, Large; Black, White)</label>
 <input id="productVariants" placeholder="Enter available types, sizes or colours separated by commas">
+<label>Extra product image URLs (one per line)</label>
+<textarea id="additionalImageUrls" placeholder="Paste one extra image URL per line"></textarea>
+<label>Product specifications (one per line)</label>
+<textarea id="productSpecifications" placeholder="Brand, material, model, dimensions..."></textarea>
 
 <label>Store</label>
 <select id="storeSelect">
@@ -306,6 +310,8 @@ async function addProduct() {
     name: name,
     description: description,
     variants: document.getElementById("productVariants").value.trim(),
+    additional_images: document.getElementById("additionalImageUrls").value.split("\n").map(x=>x.trim()).filter(Boolean),
+    specifications: document.getElementById("productSpecifications").value.trim(),
     image_url: imageUrl || null,
     selling_price: price,
     stock_quantity: stock,
@@ -319,7 +325,7 @@ async function addProduct() {
 
   message("productMessage", "Product added successfully!");
 
-  ["productName","productDescription","productVariants","imageUrl",
+  ["productName","productDescription","productVariants","additionalImageUrls","productSpecifications","imageUrl",
    "sellingPrice","stockQuantity","productImageFile"].forEach(id => {
     document.getElementById(id).value = "";
   });
@@ -417,6 +423,10 @@ async function editProduct(product) {
   if (stockText === null) return;
   const variants = prompt("Available types, sizes or colours (separate with commas):", product.variants || "");
   if (variants === null) return;
+  const specs = prompt("Product specifications (one detail per line):", product.specifications || "");
+  if (specs === null) return;
+  const extraImages = prompt("Additional image URLs (one URL per line):", (product.additional_images || []).join("\n"));
+  if (extraImages === null) return;
 
   const price = Number(priceText);
   const stock = Number(stockText);
@@ -432,7 +442,9 @@ async function editProduct(product) {
     name: name.trim(),
     selling_price: price,
     stock_quantity: stock,
-    variants: variants.trim()
+    variants: variants.trim(),
+    specifications: specs.trim(),
+    additional_images: extraImages.split("\n").map(x=>x.trim()).filter(Boolean)
   }).eq("id", product.id);
 
   if (error) {
