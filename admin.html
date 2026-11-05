@@ -336,7 +336,7 @@ async function addProduct() {
 async function loadProducts() {
   const {data, error} = await db
     .from("products")
-    .select("id, name, description, selling_price, stock_quantity, image_url, is_active")
+    .select("id, name, description, selling_price, stock_quantity, image_url, is_active, variants, additional_images, specifications")
     .order("name");
 
   const list = document.getElementById("productsList");
