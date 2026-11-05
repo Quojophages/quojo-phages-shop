@@ -166,43 +166,8 @@ let selectedCategory = "All";
 
 function getProductImage(product) {
  if (product.image_url) return product.image_url;
- const name = (product.name || "").toLowerCase();
- const category = (categoryNames[product.category_id] || "").toLowerCase();
- const matches = [
-  [["phone","iphone","samsung","tablet"],"photo-1511707171634-5f897ff02aa9"],
-  [["laptop","computer","keyboard","mouse","printer"],"photo-1496181133206-80ce9b88a853"],
-  [["shoe","sneaker","slipper","sandal","bag","handbag"],"photo-1542291026-7eec264c27ff"],
-  [["shirt","dress","jeans","clothing","watch"],"photo-1483985988355-763728e1935b"],
-  [["sofa","chair","table","bed","foam","furniture"],"photo-1555041469-a586c61ea9bc"],
-  [["mic","microphone","speaker","headphone"],"photo-1590602847861-f357a9332bbc"],
-  [["beauty","cream","makeup","lotion","perfume"],"photo-1596462502278-27bfdc403348"],
-  [["food","rice","oil","grocery","drink"],"photo-1542838132-92c53300491e"],
-  [["baby","kids","toy","children"],"photo-1516627145497-ae6968895b74"],
-  [["car","tyre","tire","automotive","motor"],"photo-1492144534655-ae79c964c9d7"],
-  [["game","gaming","console","controller"],"photo-1593305841991-05c297ba4575"],
-  [["jewellery","jewelry","ring","necklace","bracelet"],"photo-1515562141207-7a88fb7ce338"],
-  [["sport","fitness","football","ball","gym"],"photo-1461896836934-ffe607ba8211"]
- ];
- let photo = matches.find(item => item[0].some(word => name.includes(word)));
- if (photo) return "https://images.unsplash.com/" + photo[1] + "?auto=format&fit=crop&w=600&q=80";
- const categoryPhotos = {
-  "automotive":"photo-1492144534655-ae79c964c9d7",
-  "baby & kids":"photo-1516627145497-ae6968895b74",
-  "beauty & personal care":"photo-1596462502278-27bfdc403348",
-  "computers & accessories":"photo-1496181133206-80ce9b88a853",
-  "fashion":"photo-1483985988355-763728e1935b",
-  "furniture & appliances":"photo-1555041469-a586c61ea9bc",
-  "gaming & entertainment":"photo-1593305841991-05c297ba4575",
-  "groceries & food":"photo-1542838132-92c53300491e",
-  "home & kitchen":"photo-1556911220-e15b29be8c8f",
-  "jewellery & watches":"photo-1515562141207-7a88fb7ce338",
-  "phones & electronics":"photo-1511707171634-5f897ff02aa9",
-  "shoes & bags":"photo-1542291026-7eec264c27ff",
-  "speakers & pa systems":"photo-1590602847861-f357a9332bbc",
-  "sports & fitness":"photo-1461896836934-ffe607ba8211"
- };
- const id = categoryPhotos[category];
- return id ? "https://images.unsplash.com/" + id + "?auto=format&fit=crop&w=600&q=80" : "https://placehold.co/600x400?text=Quojo+Phages";
+ const label = encodeURIComponent(product.name || "Product photo needed");
+ return "https://placehold.co/600x600/f3f4f6/333333?text=" + label;
 }
 let cart = JSON.parse(localStorage.getItem("quojoCart") || "[]");
 
