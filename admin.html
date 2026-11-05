@@ -65,7 +65,10 @@ button{background:#f58220;color:white;border:0;font-weight:bold;cursor:pointer}
 <option value="">Loading stores...</option>
 </select>
 
-<input id="imageUrl" type="url" placeholder="Product image URL">
+<label for="productImageFile">Upload product picture (JPG, PNG or WebP)</label>
+<input id="productImageFile" type="file" accept="image/jpeg,image/png,image/webp">
+<p class="small">Maximum image size: 5 MB. You can also paste a public image URL below.</p>
+<input id="imageUrl" type="url" placeholder="Or paste a public product image URL">
 <input id="sellingPrice" type="number" min="0" step="0.01" placeholder="Selling price (GH₵)">
 <input id="stockQuantity" type="number" min="0" step="1" placeholder="Stock quantity">
 
@@ -232,12 +235,36 @@ async function loadCategories() {
   }
 }
 
+async function uploadProductImage(file) {
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error("Choose a JPG, PNG or WebP image.");
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Image must be 5 MB or smaller.");
+  }
+
+  const extension = file.type === "image/jpeg" ? "jpg" :
+    file.type === "image/png" ? "png" : "webp";
+  const path = "products/" + crypto.randomUUID() + "." + extension;
+  const { error } = await db.storage.from("product-images").upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType: file.type
+  });
+  if (error) throw error;
+
+  const { data } = db.storage.from("product-images").getPublicUrl(path);
+  return data.publicUrl;
+}
+
 async function addProduct() {
   const name = document.getElementById("productName").value.trim();
   const description = document.getElementById("productDescription").value.trim();
   const categoryId = document.getElementById("categorySelect").value;
   const storeId = document.getElementById("storeSelect").value;
-  const imageUrl = document.getElementById("imageUrl").value.trim();
+  const imageFile = document.getElementById("productImageFile").files[0];
+  let imageUrl = document.getElementById("imageUrl").value.trim();
   const priceText = document.getElementById("sellingPrice").value;
   const stockText = document.getElementById("stockQuantity").value;
   const price = Number(priceText);
@@ -260,7 +287,15 @@ async function addProduct() {
     }
   }
 
-  message("productMessage", "Saving product...");
+  message("productMessage", imageFile ? "Uploading product picture..." : "Saving product...");
+  if (imageFile) {
+    try {
+      imageUrl = await uploadProductImage(imageFile);
+    } catch (error) {
+      message("productMessage", "Image upload failed: " + error.message);
+      return;
+    }
+  }
 
   const {error} = await db.from("products").insert({
     store_id: storeId,
@@ -281,7 +316,7 @@ async function addProduct() {
   message("productMessage", "Product added successfully!");
 
   ["productName","productDescription","imageUrl",
-   "sellingPrice","stockQuantity"].forEach(id => {
+   "sellingPrice","stockQuantity","productImageFile"].forEach(id => {
     document.getElementById(id).value = "";
   });
 
