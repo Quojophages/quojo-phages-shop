@@ -29,6 +29,7 @@ button{background:#f58220;color:white;border:0;font-weight:bold;cursor:pointer}
 <header>
 <h2>QUOJO PHAGES</h2>
 <p>Online Shop - Admin Dashboard</p>
+<a href="./" style="display:inline-block;background:#10243a;color:white;padding:10px 14px;border-radius:7px;text-decoration:none;font-weight:bold">← Back to Shop</a>
 </header>
 
 <main>
@@ -717,6 +718,14 @@ checkAdmin = async function () {
   if (!document.getElementById("dashboard").classList.contains("hidden")) {
     startOrderNotifications();
   }
-};</script>
+};
+
+(async function restoreAdminSession() {
+  const {data,error}=await db.auth.getSession();
+  if(!error && data.session) {
+    currentUser=data.session.user;
+    await checkAdmin();
+  }
+})();</script>
 </body>
 </html>
