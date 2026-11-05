@@ -302,7 +302,7 @@ async function addProduct() {
     message("productMessage", "Extra pictures must be JPG, PNG or WebP and each 5 MB or smaller.");
     return;
   }
-  let extraImageUrls = document.getElementById("additionalImageUrls").value.split("\\n").map(x=>x.trim()).filter(Boolean);
+  let extraImageUrls = document.getElementById("additionalImageUrls").value.split("\n").map(x=>x.trim()).filter(Boolean);
   try {
     if (imageFile) {
       message("productMessage", "Uploading main product picture...");
