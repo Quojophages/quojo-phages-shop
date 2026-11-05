@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Payment status - Quojo Phages Online Shop</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f4f5f7;color:#222;margin:0;padding:24px}
+main{max-width:520px;margin:10vh auto;background:#fff;padding:28px;border-radius:12px;text-align:center;box-shadow:0 3px 18px #0001}
+h1{color:#10243a}
+button{background:#f58220;color:#fff;border:0;border-radius:6px;padding:13px 20px;font-size:16px;cursor:pointer}
+#message{line-height:1.6}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<main>
+<h1>Quojo Phages Online Shop</h1>
+<p id="message">Checking your Paystack payment securely. Please wait...</p>
+<button onclick="window.location.href='./'">Return to shop</button>
+</main>
+<script>
+const db=supabase.createClient(
+ "https://ccyltqbmepftkclzkeui.supabase.co",
+ "sb_publishable__B512z3E_pMCr2OA6nCr9A_kcpbHbBp"
+);
+async function verifyPayment(){
+ const message=document.getElementById("message");
+ const params=new URLSearchParams(window.location.search);
+ const reference=params.get("reference") || params.get("trxref");
+ if(!reference){
+  message.textContent="No payment reference was found. Please sign in and check My Orders before trying to pay again.";
+  return;
+ }
+ try{
+  const {data:sessionData,error:sessionError}=await db.auth.getSession();
+  if(sessionError) throw sessionError;
+  if(!sessionData.session){
+   message.textContent="Your payment reference is ready, but your shop session has expired. Return to the shop, log in, and contact support to confirm your payment. Do not pay again yet.";
+   return;
+  }
+  const {data,error}=await db.functions.invoke("paystack-payment",{
+   body:{action:"verify",reference}
+  });
+  if(error) throw error;
+  if(!data || data.success!==true){
+   throw new Error(data?.error || "Payment could not be confirmed.");
+  }
+  localStorage.removeItem("quojoCart");
+  message.textContent="Payment successful! Your order #"+data.order_id+" has been confirmed. Thank you for shopping with us.";
+ }catch(error){
+  message.textContent=(error && error.message ? error.message : "We could not verify your payment.")+" Please do not pay again until you check your order status or contact support.";
+ }
+}
+verifyPayment();
+</script>
+</body>
+</html>
