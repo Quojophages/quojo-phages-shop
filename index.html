@@ -134,6 +134,7 @@ footer a{color:#ffad64}
 <select class="field" id="paymentMethod">
 <option value="MTN MoMo">MTN Mobile Money</option>
 <option value="Telecel Cash">Telecel Cash</option>
+<option value="AT Money">AT Money</option>
 <option value="Paystack">Paystack (Card & Mobile Money)</option>
 </select>
 <p id="checkoutMessage" class="notice"></p>
@@ -555,7 +556,7 @@ if (!orderFetchError && savedOrder) {
     console.error("Email notification failed:", emailError);
   }
 }
-  if(payment==="Paystack" || payment==="MTN MoMo" || payment==="Telecel Cash"){
+  if(payment==="Paystack" || payment==="MTN MoMo" || payment==="Telecel Cash" || payment==="AT Money"){
    msg.textContent=payment==="MTN MoMo"
     ? "Opening Paystack to request your MTN Mobile Money approval..."
     : payment==="Telecel Cash"
