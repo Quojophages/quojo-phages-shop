@@ -224,8 +224,8 @@ async function loadProducts(){
  }
 
  allProducts = data || [];
- renderProducts();
  await loadCategories();
+ renderProducts();
 }
 
 async function loadCategories(){
