@@ -43,7 +43,7 @@ main{max-width:1100px;margin:auto;padding:15px}
 .cart-summary{font-weight:bold;font-size:18px;margin:18px 0}
 .cart-empty{text-align:center;padding:20px 0;color:#666}
 .order-card{border:1px solid #ddd;border-radius:7px;padding:12px;margin:10px 0}
-.detail-image{width:100%;max-height:260px;object-fit:contain;background:#f7f7f7;border-radius:7px}.review-card{border-bottom:1px solid #eee;padding:10px 0}.stars{color:#f58220;font-size:18px}
+.detail-image{width:100%;max-height:260px;object-fit:contain;background:#f7f7f7;border-radius:7px}.variant-label{display:block;font-weight:bold;margin:12px 0 4px}.variant-select{width:100%;padding:12px;border:1px solid #ccc;border-radius:5px;margin-bottom:12px}.review-card{border-bottom:1px solid #eee;padding:10px 0}.stars{color:#f58220;font-size:18px}
 .order-status{font-weight:bold;color:#f58220;text-transform:capitalize}
 .order-track{background:#f7f7f7;border-radius:5px;padding:9px;margin-top:8px;font-size:13px}
 footer{background:var(--navy);color:white;text-align:center;padding:25px;margin-top:30px}
@@ -280,7 +280,7 @@ function renderProducts(){
     <p class="price">GH₵ ${Number(p.selling_price).toFixed(2)}</p>
     <p>Stock: ${Number(p.stock_quantity)}</p>
     <button class="add" ${Number(p.stock_quantity)<=0?"disabled":""}
-     onclick="addToCart('${p.id}')">Add to Cart</button>
+     onclick="${p.variants && p.variants.trim() ? `openProductDetails('${p.id}')` : `addToCart('${p.id}')`}">Add to Cart</button>
    </div>
   </article>
  `).join("");
@@ -294,15 +294,19 @@ async function openProductDetails(id){
  const price=document.createElement('p'); price.className='price'; price.textContent='GH₵ '+Number(p.selling_price).toFixed(2);
  const desc=document.createElement('p'); desc.textContent=p.description||'No description has been added yet.';
  const stock=document.createElement('p'); stock.textContent='Available stock: '+Number(p.stock_quantity);
- const options=document.createElement('p'); options.textContent='Available types, sizes or colours: '+(p.variants||'Please contact the shop to confirm available options.');
- const add=document.createElement('button'); add.className='orange'; add.textContent='Add to Cart'; add.disabled=Number(p.stock_quantity)<=0; add.onclick=function(){addToCart(p.id);closeProductDetails();};
+ const optionLabel=document.createElement('label'); optionLabel.className='variant-label'; optionLabel.textContent='Choose size, colour or type';
+ const optionSelect=document.createElement('select'); optionSelect.className='variant-select'; optionSelect.id='selectedProductVariant';
+ const optionList=(p.variants||'').split(',').map(x=>x.trim()).filter(Boolean);
+ if(optionList.length){const prompt=document.createElement('option');prompt.value='';prompt.textContent='Select an option';optionSelect.appendChild(prompt);optionList.forEach(function(value){const opt=document.createElement('option');opt.value=value;opt.textContent=value;optionSelect.appendChild(opt);});}
+ else {const opt=document.createElement('option');opt.value='';opt.textContent='No option required';optionSelect.appendChild(opt);optionSelect.disabled=true;}
+ const add=document.createElement('button'); add.className='orange'; add.textContent='Add to Cart'; add.disabled=Number(p.stock_quantity)<=0; add.onclick=function(){const chosen=optionSelect.value;if(optionList.length&&!chosen){alert('Please select an option first.');return;}addToCart(p.id,chosen);closeProductDetails();};
  const heading=document.createElement('h3'); heading.textContent='Customer Reviews';
  const reviews=document.createElement('div'); reviews.id='productReviews'; reviews.textContent='Loading reviews...';
  const rating=document.createElement('select'); rating.className='field'; rating.id='reviewRating';
  for(let n=5;n>=1;n--){const o=document.createElement('option');o.value=String(n);o.textContent=n+' stars';rating.appendChild(o);}
  const review=document.createElement('textarea'); review.className='field'; review.id='reviewText'; review.placeholder='Write your review'; review.rows=3;
  const submit=document.createElement('button'); submit.className='orange'; submit.textContent='Submit Review'; submit.onclick=function(){submitProductReview(id);};
- box.append(image,name,price,desc,stock,options,add,heading,reviews,rating,review,submit);
+ if(optionList.length) box.append(image,name,price,desc,stock,optionLabel,optionSelect,add,heading,reviews,rating,review,submit); else box.append(image,name,price,desc,stock,add,heading,reviews,rating,review,submit);
  document.getElementById('productModal').style.display='flex'; await loadProductReviews(id);
 }
 function closeProductDetails(){document.getElementById('productModal').style.display='none';}
@@ -326,7 +330,7 @@ async function submitProductReview(id){
  document.getElementById('reviewText').value=''; await loadProductReviews(id);
 }
 
-function addToCart(id){
+function addToCart(id,selectedVariant=''){
  const p = allProducts.find(x=>x.id===id);
  if(!p) return;
 
@@ -338,7 +342,7 @@ function addToCart(id){
   }
   item.quantity++;
  }else{
-  cart.push({...p,quantity:1});
+  cart.push({...p,selected_variant:selectedVariant,quantity:1});
  }
  saveCart();
  alert("Product added to your cart.");
@@ -510,6 +514,7 @@ function renderCart(){
    <img src="${getProductImage(p)}" alt="${p.name}" onerror="this.onerror=null;this.src=\'https://placehold.co/120x120?text=Quojo\'">
    <div>
     <p class="cart-item-name">${p.name}</p>
+    ${p.selected_variant ? `<div>Selected: ${p.selected_variant}</div>` : ''}
     <div>GH₵ ${Number(p.selling_price).toFixed(2)} each</div>
     <div class="cart-controls">
      <button onclick="changeCartQty('${p.id}',-1)" aria-label="Decrease quantity">−</button>
@@ -612,7 +617,8 @@ async function submitCheckout(){
 
   const items=cart.map(p=>({
    product_id:p.id,
-   quantity:Number(p.quantity)
+   quantity:Number(p.quantity),
+   selected_variant:p.selected_variant||''
   }));
 
   const {data:orderId,error}=await db.rpc("place_shop_order",{
@@ -626,6 +632,8 @@ async function submitCheckout(){
   });
 
   if(error) throw error;
+  const {error: variantSaveError}=await db.rpc('save_order_item_variants',{p_order_id:orderId,p_items:items});
+  if(variantSaveError) throw new Error('Your order was created, but saving the selected product options failed: '+variantSaveError.message+'. Please contact the shop before placing another order.');
 const { data: savedOrder, error: orderFetchError } = await db
   .from("orders")
   .select("total_amount")
