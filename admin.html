@@ -72,9 +72,11 @@ button{background:#f58220;color:white;border:0;font-weight:bold;cursor:pointer}
 <option value="">Loading stores...</option>
 </select>
 
-<label for="productImageFile">Upload product picture (JPG, PNG or WebP)</label>
+<label for="productImageFile">Upload main product picture (JPG, PNG or WebP)</label>
 <input id="productImageFile" type="file" accept="image/jpeg,image/png,image/webp">
-<p class="small">Maximum image size: 5 MB. You can also paste a public image URL below.</p>
+<label for="additionalImageFiles">Upload more pictures of this same product (select multiple)</label>
+<input id="additionalImageFiles" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+<p class="small">Each image must be 5 MB or smaller. Add real photos of the same product from different angles. You can also paste public image URLs below.</p>
 <input id="imageUrl" type="url" placeholder="Or paste a public product image URL">
 <input id="sellingPrice" type="number" min="0" step="0.01" placeholder="Selling price (GH₵)">
 <input id="stockQuantity" type="number" min="0" step="1" placeholder="Stock quantity">
@@ -295,13 +297,24 @@ async function addProduct() {
   }
 
   message("productMessage", imageFile ? "Uploading product picture..." : "Saving product...");
-  if (imageFile) {
-    try {
+  const extraFiles = Array.from(document.getElementById("additionalImageFiles").files || []);
+  if (extraFiles.some(file => !["image/jpeg","image/png","image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024)) {
+    message("productMessage", "Extra pictures must be JPG, PNG or WebP and each 5 MB or smaller.");
+    return;
+  }
+  let extraImageUrls = document.getElementById("additionalImageUrls").value.split("\\n").map(x=>x.trim()).filter(Boolean);
+  try {
+    if (imageFile) {
+      message("productMessage", "Uploading main product picture...");
       imageUrl = await uploadProductImage(imageFile);
-    } catch (error) {
-      message("productMessage", "Image upload failed: " + error.message);
-      return;
     }
+    for (let i = 0; i < extraFiles.length; i++) {
+      message("productMessage", "Uploading extra picture " + (i + 1) + " of " + extraFiles.length + "...");
+      extraImageUrls.push(await uploadProductImage(extraFiles[i]));
+    }
+  } catch (error) {
+    message("productMessage", "Image upload failed: " + error.message);
+    return;
   }
 
   const {error} = await db.from("products").insert({
@@ -310,7 +323,7 @@ async function addProduct() {
     name: name,
     description: description,
     variants: document.getElementById("productVariants").value.trim(),
-    additional_images: document.getElementById("additionalImageUrls").value.split("\n").map(x=>x.trim()).filter(Boolean),
+    additional_images: extraImageUrls,
     specifications: document.getElementById("productSpecifications").value.trim(),
     image_url: imageUrl || null,
     selling_price: price,
@@ -326,7 +339,7 @@ async function addProduct() {
   message("productMessage", "Product added successfully!");
 
   ["productName","productDescription","productVariants","additionalImageUrls","productSpecifications","imageUrl",
-   "sellingPrice","stockQuantity","productImageFile"].forEach(id => {
+   "sellingPrice","stockQuantity","productImageFile","additionalImageFiles"].forEach(id => {
     document.getElementById(id).value = "";
   });
 
@@ -398,12 +411,46 @@ async function loadProducts() {
       picker.click();
     };
 
+    const galleryButton = document.createElement("button");
+    galleryButton.className = "secondary";
+    galleryButton.textContent = "Add Gallery Photos (" + (product.additional_images || []).length + ")";
+    galleryButton.onclick = () => {
+      const picker = document.createElement("input");
+      picker.type = "file";
+      picker.accept = "image/jpeg,image/png,image/webp";
+      picker.multiple = true;
+      picker.onchange = async () => {
+        const files = Array.from(picker.files || []);
+        if (!files.length) return;
+        if (files.some(file => !["image/jpeg","image/png","image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024)) {
+          alert("Choose JPG, PNG or WebP pictures, each 5 MB or smaller.");
+          return;
+        }
+        galleryButton.disabled = true;
+        galleryButton.textContent = "Uploading gallery...";
+        try {
+          const uploaded = [];
+          for (const file of files) uploaded.push(await uploadProductImage(file));
+          const { error: updateError } = await db.from("products")
+            .update({ additional_images: [...(product.additional_images || []), ...uploaded] })
+            .eq("id", product.id);
+          if (updateError) throw updateError;
+          await loadProducts();
+        } catch (error) {
+          alert("Gallery upload failed: " + error.message);
+          galleryButton.disabled = false;
+          galleryButton.textContent = "Add Gallery Photos";
+        }
+      };
+      picker.click();
+    };
+
     const toggle = document.createElement("button");
     toggle.className = product.is_active ? "danger" : "secondary";
     toggle.textContent = product.is_active ? "Deactivate Product" : "Activate Product";
     toggle.onclick = () => toggleProduct(product);
 
-    item.append(title, details, edit, imageButton, toggle);
+    item.append(title, details, edit, imageButton, galleryButton, toggle);
     list.appendChild(item);
   });
 
