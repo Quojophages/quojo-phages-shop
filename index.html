@@ -167,7 +167,8 @@ let categoryNames = {};
 let selectedCategory = "All";
 
 function getProductImage(product) {
- if (product.image_url) return product.image_url;
+ const imageUrl = String(product.image_url || "").trim();
+ if (imageUrl) return imageUrl;
  const label = encodeURIComponent(product.name || "Product photo needed");
  return "https://placehold.co/600x600/f3f4f6/333333?text=" + label;
 }
